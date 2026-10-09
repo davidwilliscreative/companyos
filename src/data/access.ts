@@ -1,0 +1,237 @@
+import type { Account, CompensationRecord, Dataset, ID, Organization, Person, ProfileId, RoleId, Signal, Thread } from "@/domain/types";
+import { getProfile, type ProfileConfig } from "@/domain/profiles";
+import { computeAnalysis, type Analysis } from "@/lib/analytics";
+import { cashForecast, monthlySeries, periodSummary, revenueConcentration, DEFAULT_CASH_ASSUMPTIONS, type CashAssumptions, type CashForecast, type MonthPoint, type PeriodSummary } from "@/lib/calc/company";
+import { annualLoadedCost, compOn, costRateOn } from "@/lib/calc/finance";
+import { capsFor, type Capabilities } from "@/lib/permissions";
+import { changesSince, type ChangeItem } from "@/lib/changes";
+import { buildDataset } from "./dataset";
+import { ORG_BY_PROFILE } from "./seed";
+import { overlayFor, type OrgOverlay } from "./state";
+import type { StateStore } from "./store";
+
+/**
+ * The permission boundary. Everything a screen or the assistant can read comes
+ * from a Workspace, which is built from the full dataset and then filtered for
+ * the organization and role. Restricted values are removed, not hidden in UI.
+ */
+
+export interface RequestContext {
+  profileId: ProfileId;
+  orgId: ID;
+  role: RoleId;
+  periodKey?: string;
+}
+
+export interface PersonCost {
+  hourlyCost: number | null;
+  annualLoaded: number | null;
+  effectiveFrom: string | null;
+}
+
+export interface FinanceView {
+  scope: "company" | "own_accounts";
+  summary: PeriodSummary;
+  monthly: MonthPoint[];
+  cash: CashForecast | null;
+  concentration: ReturnType<typeof revenueConcentration> | null;
+}
+
+export interface Workspace {
+  ctx: RequestContext;
+  caps: Capabilities;
+  org: Organization;
+  profile: ProfileConfig;
+  user: Person;
+  /** Redacted dataset: only permitted records; compensation removed unless allowed; message bodies removed where not allowed. */
+  data: Dataset;
+  compensation: CompensationRecord[] | null;
+  personCosts: Record<ID, PersonCost> | null;
+  analysis: Analysis;
+  finance: FinanceView | null;
+  overlay: OrgOverlay;
+  changes: { since: string; until: string; items: ChangeItem[] };
+  /** Non-sensitive planning data across all work (assignments, time off) for capacity questions. Other accounts' project names are redacted. */
+  planning: Pick<Dataset, "org" | "people" | "projects" | "timeOff">;
+  scopeNote: string | null;
+  canViewThread: (t: Thread) => boolean;
+  accountIds: Set<ID>;
+}
+
+function threadVisible(caps: Capabilities, t: Thread, accountIds: Set<ID>): boolean {
+  if (caps.communications === "all") return true;
+  if (caps.communications === "billing_only") return t.tags.includes("billing");
+  if (caps.communications === "own_accounts") return !!t.accountId && accountIds.has(t.accountId);
+  return false;
+}
+
+function redactSignal(s: Signal, visible: (threadId: ID) => boolean): Signal {
+  const red = (e: Signal["evidence"][number]) => (visible(e.threadId) ? e : { ...e, excerpt: "Content restricted for your role", author: "Restricted" });
+  return { ...s, evidence: s.evidence.map(red), counterEvidence: s.counterEvidence.map(red), resolutionEvidence: s.resolutionEvidence.map(red), explanation: s.evidence.every((e) => visible(e.threadId)) ? s.explanation : "Evidence comes from communications your role cannot read. The category, severity and dates are shown; ask an authorized colleague for detail." };
+}
+
+export function buildWorkspace(ctx: RequestContext, store: StateStore, opts: { cash?: CashAssumptions } = {}): Workspace {
+  const state = store.read();
+  const overlay = overlayFor(state, ctx.orgId);
+  const full = buildDataset(ctx.profileId, overlay);
+  if (full.org.id !== ctx.orgId) throw new Error("Organization mismatch");
+  const caps = capsFor(ctx.role);
+  const profile = getProfile(ctx.profileId);
+  const userId = full.org.demoPersonas[ctx.role];
+  const user = full.people.find((p) => p.id === userId)!;
+  const analysis = computeAnalysis(full, overlay, ctx.periodKey);
+
+  // ---- Record-level scoping ----
+  const sameOrg = <T extends { orgId: ID }>(xs: T[]) => xs.filter((x) => x.orgId === ctx.orgId);
+  const accounts: Account[] = sameOrg(full.accounts).filter((a) => caps.allAccounts || a.ownerId === userId);
+  const accountIds = new Set(accounts.map((a) => a.id));
+  const projectAllowed = (p: { accountId?: ID; ownerId: ID }) => caps.allAccounts || (p.accountId ? accountIds.has(p.accountId) : false);
+  const projects = sameOrg(full.projects).filter(projectAllowed);
+  const projectIds = new Set(projects.map((p) => p.id));
+  const visible = (t: Thread) => (t.accountId ? accountIds.has(t.accountId) || caps.allAccounts : caps.allAccounts) && threadVisible(caps, t, accountIds);
+  const threadById = new Map(full.threads.map((t) => [t.id, t]));
+  const visibleId = (id: ID) => {
+    const t = threadById.get(id);
+    return !!t && visible(t);
+  };
+
+  const data: Dataset = {
+    ...full,
+    accounts,
+    projects,
+    contracts: full.contracts.filter((c) => !c.accountId || accountIds.has(c.accountId) || caps.allAccounts),
+    milestones: full.milestones.filter((m) => projectIds.has(m.projectId)),
+    tasks: full.tasks.filter((t) => projectIds.has(t.projectId)),
+    timeEntries: full.timeEntries.filter((e) => projectIds.has(e.projectId)),
+    expenses: caps.viewProjectCosts ? full.expenses.filter((x) => !x.projectId || projectIds.has(x.projectId)) : [],
+    invoices: full.invoices.filter((i) => accountIds.has(i.accountId)),
+    payments: full.payments.filter((p) => full.invoices.some((i) => i.id === p.invoiceId && accountIds.has(i.accountId))),
+    subscriptions: full.subscriptions.filter((s) => accountIds.has(s.accountId)),
+    // Threads the role cannot read are dropped entirely, including metadata.
+    threads: full.threads.filter(visible),
+    compensation: caps.viewCompensation ? full.compensation : [],
+    actions: full.actions.filter((a) => !a.accountId || accountIds.has(a.accountId) || caps.allAccounts),
+    mappings: caps.manageIntegrations || caps.viewCompanyFinance || ctx.role === "executive" ? full.mappings : [],
+  };
+
+  // ---- Analysis scoping ----
+  const pick = <T,>(rec: Record<ID, T>, allowed: Set<ID>) => Object.fromEntries(Object.entries(rec).filter(([k]) => allowed.has(k))) as Record<ID, T>;
+  const milestoneIds = new Set(data.milestones.map((m) => m.id));
+  const scoped: Analysis = {
+    ...analysis,
+    projectFin: caps.viewProjectCosts ? pick(analysis.projectFin, projectIds) : {},
+    milestones: pick(analysis.milestones, milestoneIds),
+    signals: analysis.signals.filter((s) => accountIds.has(s.accountId)).map((s) => redactSignal(s, visibleId)),
+    opportunities: analysis.opportunities.filter((o) => accountIds.has(o.accountId)).map((o) => ({ ...o, evidence: o.evidence.map((e) => (visibleId(e.threadId) ? e : { ...e, excerpt: "Content restricted for your role", author: "Restricted" })), need: o.evidence.every((e) => visibleId(e.threadId)) ? o.need : "Restricted for your role" })),
+    health: pick(analysis.health, accountIds),
+    healthPrev: pick(analysis.healthPrev, accountIds),
+    receivables: (() => {
+      const filt = (xs: typeof analysis.receivables.open) => xs.filter((s) => accountIds.has(s.invoice.accountId));
+      const open = filt(analysis.receivables.open);
+      const overdue = filt(analysis.receivables.overdue);
+      const buckets = { current: 0, "1-30": 0, "31-60": 0, "61-90": 0, "90+": 0 } as typeof analysis.receivables.buckets;
+      for (const s of open) buckets[s.bucket as keyof typeof buckets] += s.outstanding;
+      return { open, overdue, buckets, totalOutstanding: open.reduce((s, x) => s + x.outstanding, 0), totalOverdue: overdue.reduce((s, x) => s + x.outstanding, 0) };
+    })(),
+    attention: analysis.attention.filter((i) => {
+      if (i.accountId) return accountIds.has(i.accountId);
+      if (i.projectId) return projectIds.has(i.projectId);
+      if (i.kind === "capacity") return caps.allAccounts || i.links.some((l) => l.type === "task" && data.tasks.some((t) => t.id === l.id));
+      return caps.allAccounts;
+    }).filter((i) => (i.kind === "margin" ? caps.viewProjectCosts : true)).filter((i) => (i.kind === "invoice" ? caps.viewCompanyFinance || accountIds.has(i.accountId ?? "") : true)),
+    renewals: analysis.renewals.filter((r) => accountIds.has(r.accountId)),
+    capacity: {
+      ...analysis.capacity,
+      people: analysis.capacity.people.map((pc) => ({ ...pc, projects: pc.projects.map((x) => (projectIds.has(x.projectId) ? x : { ...x, projectId: "__other__" })) })),
+      gaps: analysis.capacity.gaps.filter((g) => projectIds.has(g.projectId)),
+    },
+  };
+
+  // ---- Compensation (restricted) ----
+  let personCosts: Record<ID, PersonCost> | null = null;
+  if (caps.viewCompensation) {
+    personCosts = {};
+    for (const p of full.people) {
+      const rec = compOn(full, p.id, full.org.demoDate);
+      personCosts[p.id] = { hourlyCost: costRateOn(full, p.id, full.org.demoDate), annualLoaded: p.type === "employee" ? annualLoadedCost(rec) : null, effectiveFrom: rec?.effectiveFrom ?? null };
+    }
+  }
+
+  // ---- Finance views ----
+  let finance: FinanceView | null = null;
+  if (caps.viewCompanyFinance) {
+    const period = analysis.period;
+    finance = {
+      scope: "company",
+      summary: periodSummary(full, period),
+      monthly: monthlySeries(full, 6),
+      cash: profile.modules.financeMode === "budget" ? null : cashForecast(full, opts.cash ?? DEFAULT_CASH_ASSUMPTIONS),
+      concentration: profile.modules.financeMode === "budget" ? null : revenueConcentration(full, period),
+    };
+  } else if (caps.viewProjectCosts) {
+    // Account owners: the same calculations restricted to their own accounts' projects. No payroll, overhead or cash.
+    const s = periodSummary(full, analysis.period);
+    const lines = s.lines.filter((l) => projectIds.has(l.projectId));
+    const clientLines = lines.filter((l) => full.projects.find((p) => p.id === l.projectId)?.kind === "client");
+    const earned = clientLines.reduce((x, l) => x + (l.earned ?? 0), 0);
+    const cost = clientLines.reduce((x, l) => x + l.labor + l.contractor + l.expenses, 0);
+    const own: PeriodSummary = {
+      ...s,
+      earnedRevenue: earned,
+      projectRevenue: earned,
+      subscriptionRevenue: 0,
+      clientDirectCost: cost,
+      deliveryMargin: earned > 0 ? (earned - cost) / earned : null,
+      deliveryProfit: earned - cost,
+      invoiced: data.invoices.filter((i) => i.issueDate >= s.period.start && i.issueDate <= s.period.end).reduce((x, i) => x + i.amount, 0),
+      collected: data.payments.filter((p) => p.date >= s.period.start && p.date <= s.period.end).reduce((x, p) => x + p.amount, 0),
+      payroll: Number.NaN,
+      absorbedEmployeeLabor: Number.NaN,
+      nonClientLabor: Number.NaN,
+      internalContractorAndExpenses: Number.NaN,
+      overhead: Number.NaN,
+      operatingResult: Number.NaN,
+      lines,
+      missing: s.missing.filter((m) => !m.startsWith("Payroll")),
+    };
+    finance = { scope: "own_accounts", summary: own, monthly: [], cash: null, concentration: null };
+  }
+
+  const rawChanges = changesSince(full, overlay, analysis.signals, 7);
+  const changes = {
+    ...rawChanges,
+    items: rawChanges.items
+      .filter((c) => (c.accountId ? accountIds.has(c.accountId) : c.projectId ? projectIds.has(c.projectId) : caps.allAccounts))
+      .filter((c) => (c.kind === "payment" || c.kind === "invoice" ? caps.viewCompanyFinance || caps.viewProjectCosts : true))
+  };
+
+  const scopeNote = caps.allAccounts ? null : `Showing the ${accounts.length} ${accounts.length === 1 ? profile.terms.account.toLowerCase() : profile.terms.accounts.toLowerCase()} owned by ${user.name}.`;
+
+  return {
+    ctx,
+    caps,
+    org: full.org,
+    profile,
+    user,
+    data,
+    compensation: caps.viewCompensation ? full.compensation : null,
+    personCosts,
+    analysis: scoped,
+    finance,
+    overlay,
+    changes,
+    planning: {
+      org: full.org,
+      people: full.people,
+      timeOff: full.timeOff,
+      projects: full.projects.map((p) => (projectIds.has(p.id) ? p : { ...p, name: "Other work", accountId: undefined, description: "", scopeChanges: [] })),
+    },
+    scopeNote,
+    canViewThread: visible,
+    accountIds,
+  };
+}
+
+export function contextFor(profileId: ProfileId, role: RoleId, periodKey?: string): RequestContext {
+  return { profileId, orgId: ORG_BY_PROFILE[profileId], role, periodKey };
+}
