@@ -3,7 +3,7 @@
 import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 /** Categorical slots in fixed order (validated for colour-vision deficiency), plus recessive chart chrome. */
-const C = { s1: "#2a78d6", s2: "#eb6834", s3: "#1baf7a", ink: "#0e1015", muted: "#a6aab5", grid: "#eeeef2", axis: "#7c8190", bad: "#c0352b" };
+const C = { s1: "#2a78d6", s2: "#eb6834", s3: "#1baf7a", ink: "#0e1015", muted: "#a6aab5", grid: "#eeeef2", axis: "#7c8190", bad: "#be123c" };
 const AXIS = { tick: { fontSize: 11, fill: C.axis }, axisLine: false, tickLine: false } as const;
 const TOOLTIP = {
   contentStyle: { borderRadius: 12, border: "1px solid #e7e7ec", boxShadow: "0 8px 24px -8px rgba(14,16,21,0.18)", fontSize: 12, padding: "8px 12px" },
