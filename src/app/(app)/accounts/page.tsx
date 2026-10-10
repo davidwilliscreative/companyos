@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, EmptyState, HealthBadge, PageHeader, Trend } from "@/components/ui";
+import { Badge, Card, EmptyState, HealthBadge, PageHeader, Trend } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
 import { fmtDate } from "@/lib/dates";
 import { fmtPct } from "@/lib/money";
@@ -123,22 +123,29 @@ export default async function AccountsPage({ searchParams }: { searchParams: SP 
                   const lastSeats = r.sub?.activeSeatsByMonth.at(-1);
                   return (
                     <tr key={r.acc.id} className="hover:bg-canvas/60">
-                      <td className="td">
-                        <Link href={`/accounts/${r.acc.id}`} className="font-medium">
-                          {r.acc.name}
-                        </Link>
-                        <div className="text-xs text-ink-muted">
-                          {r.acc.industry}
-                          {r.acc.segment ? ` · ${r.acc.segment}` : ""}
+                      <td className="td min-w-[220px]">
+                        <div className="flex items-center gap-3">
+                          <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-canvas text-[11px] font-semibold text-ink-soft ring-1 ring-inset ring-line">
+                            {r.acc.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("")}
+                          </span>
+                          <div className="min-w-0">
+                            <Link href={`/accounts/${r.acc.id}`} className="font-medium">
+                              {r.acc.name}
+                            </Link>
+                            <div className="text-xs text-ink-muted">
+                              {r.acc.industry}
+                              {r.acc.segment ? ` · ${r.acc.segment}` : ""}
+                            </div>
+                          </div>
                         </div>
                       </td>
-                      <td className="td">
-                        {r.h && <HealthBadge status={r.h.status} score={r.h.score} />}
-                        <div className="mt-0.5">
+                      <td className="td whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          {r.h && <HealthBadge status={r.h.status} score={r.h.score} />}
                           <Trend delta={r.delta} />
                         </div>
                       </td>
-                      <td className="td">{v.person(r.acc.ownerId)}</td>
+                      <td className="td whitespace-nowrap">{v.person(r.acc.ownerId)}</td>
                       <td className="td num">{r.projects.length}</td>
                       {mode === "delivery" && ws.finance && <td className="td num">{v.money(r.revenue, { compact: true })}</td>}
                       {mode === "delivery" && ws.finance && <td className={`td num ${r.margin !== null && r.margin < 0.3 ? "text-bad" : ""}`}>{fmtPct(r.margin)}</td>}
@@ -146,8 +153,21 @@ export default async function AccountsPage({ searchParams }: { searchParams: SP 
                       {mode === "subscription" && <td className="td num">{r.sub ? (lastSeats === null || lastSeats === undefined ? <span className="text-ink-muted">no data</span> : `${lastSeats}/${r.sub.seats}`) : "—"}</td>}
                       {mode === "budget" && <td className="td num">{v.money(r.budget, { compact: true })}</td>}
                       {ws.profile.modules.invoices && (ws.caps.viewCompanyFinance || ws.caps.viewProjectCosts) && <td className={`td num ${r.overdue > 0 ? "text-warn" : ""}`}>{r.overdue > 0 ? v.money(r.overdue, { compact: true }) : "—"}</td>}
-                      <td className="td text-xs">{r.risks.length ? r.risks.map((s) => CATEGORY_LABEL[s.category]).join(", ") : <span className="text-ink-muted">None</span>}</td>
-                      <td className="td text-xs">{r.renewal ? fmtDate(r.renewal.renewalDate) : <span className="text-ink-muted">—</span>}</td>
+                      <td className="td min-w-[180px]">
+                        {r.risks.length ? (
+                          <div className="flex flex-wrap gap-1" title={r.risks.map((s) => CATEGORY_LABEL[s.category]).join(", ")}>
+                            {r.risks.slice(0, 2).map((s) => (
+                              <Badge key={s.id} tone={s.severity === "critical" || s.severity === "high" ? "bad" : "warn"}>
+                                {CATEGORY_LABEL[s.category]}
+                              </Badge>
+                            ))}
+                            {r.risks.length > 2 && <Badge>+{r.risks.length - 2}</Badge>}
+                          </div>
+                        ) : (
+                          <span className="text-ink-faint">None</span>
+                        )}
+                      </td>
+                      <td className="td whitespace-nowrap">{r.renewal ? fmtDate(r.renewal.renewalDate) : <span className="text-ink-faint">—</span>}</td>
                     </tr>
                   );
                 })}

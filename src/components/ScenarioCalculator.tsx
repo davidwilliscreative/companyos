@@ -52,11 +52,11 @@ export function ScenarioCalculator({ projectId, base, currency, canApply, applie
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-[#d3e0ec] bg-accent-soft px-3 py-2 text-xs text-accent">
+      <div className="rounded-lg border border-accent-line bg-accent-soft px-3 py-2 text-xs text-accent">
         Exploring a scenario changes nothing. The project forecast only changes if {canApply ? "you" : "an Executive or Finance user"} explicitly apply it below.
       </div>
       {applied && (
-        <div className="rounded-lg border border-[#f1dfb8] bg-warn-soft px-3 py-2 text-xs text-warn">
+        <div className="rounded-lg border border-warn-line bg-warn-soft px-3 py-2 text-xs text-warn">
           A scenario is currently applied to this forecast: “{applied.note || "no note"}” by {applied.by} on {applied.at.slice(0, 10)}. Base figures below already include it.
         </div>
       )}

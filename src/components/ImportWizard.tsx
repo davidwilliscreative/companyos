@@ -23,7 +23,7 @@ export interface WizardDataset {
 const ACTION_TONE: Record<string, string> = {
   create: "bg-good-soft text-good",
   update: "bg-accent-soft text-accent",
-  unchanged: "bg-[#eef0ec] text-ink-soft",
+  unchanged: "bg-canvas text-ink-soft",
   reject: "bg-bad-soft text-bad",
   duplicate: "bg-warn-soft text-warn",
 };

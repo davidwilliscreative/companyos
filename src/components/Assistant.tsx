@@ -1,5 +1,6 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -13,8 +14,8 @@ interface Turn {
 
 const KIND_CLS: Record<string, string> = {
   calculated: "bg-accent-soft text-accent",
-  observed: "bg-[#eef1f5] text-ink-soft",
-  inferred: "bg-[#f3eefa] text-[#5b3f8a]",
+  observed: "bg-canvas text-ink-soft",
+  inferred: "bg-violet-soft text-violet",
   estimate: "bg-warn-soft text-warn",
 };
 
@@ -52,7 +53,7 @@ export function AssistantChat({ accountId, accountName, suggestions, autoFocus =
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-2 rounded-lg border border-[#f1dfb8] bg-warn-soft px-3 py-2 text-xs text-warn">
+      <div className="mb-2 rounded-lg border border-warn-line bg-warn-soft px-3 py-2 text-xs text-warn">
         <strong>Simulated assistant.</strong> No AI service is connected. Answers are composed deterministically from {accountName ? `${accountName}'s` : "your permitted"} records and the same calculations as the dashboard. Read-only.
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">
@@ -72,7 +73,7 @@ export function AssistantChat({ accountId, accountName, suggestions, autoFocus =
           <div key={i} className="space-y-2">
             <div className="ml-8 rounded-lg bg-ink px-3 py-2 text-sm text-white">{t.q}</div>
             {!t.a && !t.error && <div className="text-sm text-ink-muted">Retrieving records…</div>}
-            {t.error && <div className="rounded-lg border border-[#efcdc7] bg-bad-soft px-3 py-2 text-sm text-bad">{t.error}</div>}
+            {t.error && <div className="rounded-lg border border-bad-line bg-bad-soft px-3 py-2 text-sm text-bad">{t.error}</div>}
             {t.a && <Answer a={t.a} onFollowUp={ask} />}
           </div>
         ))}
@@ -103,7 +104,7 @@ function Answer({ a, onFollowUp }: { a: AssistantResponse; onFollowUp: (q: strin
       <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
         <span className="rounded bg-warn-soft px-1.5 py-0.5 font-medium text-warn">{a.provider.label}</span>
         <span>{a.period}</span>
-        {a.insufficient && <span className="rounded bg-[#eef0ec] px-1.5 py-0.5 font-medium text-ink-soft">Insufficient information</span>}
+        {a.insufficient && <span className="rounded bg-canvas px-1.5 py-0.5 font-medium text-ink-soft">Insufficient information</span>}
       </div>
       <div className="space-y-1.5 text-ink">
         {a.answer.map((p, i) => (
@@ -173,22 +174,26 @@ export function AssistantDrawer({ suggestions }: { suggestions: string[] }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (!open) btnRef.current?.focus({ preventScroll: true });
+    // Return focus to the button only after the drawer closes, not on first render.
+    if (!open && wasOpen.current) btnRef.current?.focus({ preventScroll: true });
+    wasOpen.current = open;
   }, [open]);
   return (
     <>
-      <button ref={btnRef} className="btn btn-primary" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
-        Ask CompanyOS <kbd className="hidden rounded bg-white/20 px-1 text-[10px] sm:inline">⌘K</kbd>
+      <button ref={btnRef} className="btn btn-primary rounded-full pl-3 pr-2" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
+        <Sparkles aria-hidden="true" size={15} className="text-[#a9a4ff]" />
+        Ask CompanyOS <kbd className="hidden rounded-md bg-white/15 px-1.5 py-0.5 font-sans text-[10px] font-medium text-white/80 sm:inline">⌘K</kbd>
       </button>
       {open &&
         createPortal(
         <div className="fixed inset-0 z-50 flex justify-end">
-          <button aria-label="Close assistant" className="absolute inset-0 bg-ink/20" onClick={() => setOpen(false)} />
-          <div role="dialog" aria-modal="true" aria-label="CompanyOS assistant" className="relative flex h-full w-full max-w-xl flex-col bg-canvas p-4 shadow-xl">
+          <button aria-label="Close assistant" className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
+          <div role="dialog" aria-modal="true" aria-label="CompanyOS assistant" className="relative flex h-full w-full max-w-xl flex-col border-l border-line bg-canvas p-5 shadow-pop">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <div className="text-sm font-semibold">Assistant</div>
+                <div className="flex items-center gap-2 text-base font-semibold tracking-tight"><Sparkles aria-hidden="true" size={16} className="text-accent" />Assistant</div>
                 <div className="text-xs text-ink-muted">Company-wide, limited to what your role can see</div>
               </div>
               <button className="btn" onClick={() => setOpen(false)}>

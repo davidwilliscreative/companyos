@@ -4,11 +4,11 @@ import { AssistantChat } from "@/components/Assistant";
 import { UsageChart } from "@/components/Charts";
 import { SignalRow, peopleOptions } from "@/components/blocks";
 import { ActionForm } from "@/components/forms";
-import { Badge, Card, DefList, EmptyState, HealthBadge, KindTag, MilestoneBadge, Notice, PageHeader, SeverityBadge, Trend } from "@/components/ui";
+import { Badge, Card, DefList, EmptyState, HealthBadge, KindTag, MilestoneBadge, Notice, PageHeader, SeverityBadge, Stat, Trend, CardLink } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
 import { answerQuestion } from "@/lib/assistant/simulated";
 import { invoiceStatus, paymentBehavior } from "@/lib/calc/company";
-import { addDays, addMonths, fmtDate, fmtMonthShort, monthsBetween, relativeDays } from "@/lib/dates";
+import { addDays, addMonths, daysBetween, fmtDate, fmtMonthShort, monthsBetween, relativeDays } from "@/lib/dates";
 import { fmtPct } from "@/lib/money";
 import { viewHelpers } from "@/lib/view";
 
@@ -38,6 +38,11 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
   const summary = answerQuestion(ws, { question: `Summarize ${acc.name}`, scope: { accountId: acc.id } });
   const renewal = a.renewals.find((r) => r.accountId === acc.id);
   const months = monthsBetween(ws.org.dataStart, addMonths(ws.org.demoDate, 0));
+  const showAr = ws.profile.modules.invoices && (ws.caps.viewCompanyFinance || ws.caps.viewProjectCosts);
+  const ar = invoices.map((i) => invoiceStatus(ws.data, i));
+  const arOutstanding = ar.reduce((s, x) => s + x.outstanding, 0);
+  const arOverdue = ar.filter((x) => x.daysOverdue > 0).reduce((s, x) => s + x.outstanding, 0);
+  const activeProjects = projects.filter((p) => p.status !== "completed");
 
   return (
     <div className="space-y-6">
@@ -51,13 +56,23 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <HealthBadge status={h.status} score={h.score} />
-            <Trend delta={delta} suffix=" pts in 30 days" />
             <span>
-              · {acc.industry} · {t.owner}: {v.person(acc.ownerId)} · {t.account.toLowerCase()} since {fmtDate(acc.since, { year: true })}
+              {acc.industry} · {t.owner}: {v.person(acc.ownerId)} · {t.account.toLowerCase()} since {fmtDate(acc.since, { year: true })}
             </span>
           </span>
         }
       />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:gap-4">
+        <Stat label="Health score" value={h.status === "insufficient" || h.score === null ? "—" : <>{h.score}<span className="text-lg font-medium text-ink-faint">/100</span></>} sub={<Trend delta={delta} suffix=" pts in 30 days" />} kind="calculated" href="#health" tone={h.status === "at_risk" ? "bad" : h.status === "watch" ? "warn" : h.status === "healthy" ? "good" : undefined} />
+        <Stat label="Next renewal" value={renewal ? fmtDate(renewal.renewalDate) : "—"} sub={renewal ? `${relativeDays(ws.org.demoDate, renewal.renewalDate)} · ${v.money(renewal.annualValue, { compact: true })} a year` : "No renewal on file"} kind="observed" tone={renewal && daysBetween(ws.org.demoDate, renewal.renewalDate) <= 60 ? "warn" : undefined} />
+        {showAr ? (
+          <Stat label="Receivables" value={v.money(arOutstanding, { compact: true })} sub={arOverdue > 0 ? `${v.money(arOverdue, { compact: true })} overdue` : "Nothing overdue"} kind="observed" href="#invoices" tone={arOverdue > 0 ? "warn" : undefined} />
+        ) : (
+          <Stat label={`Active ${t.projects.toLowerCase()}`} value={activeProjects.length} sub={`${projects.length} in total`} kind="observed" />
+        )}
+        <Stat label="Open risks" value={openRisks.length} sub={openRisks.length ? `Highest: ${openRisks[0].severity}` : "None open"} kind="inferred" href="#signals" tone={openRisks.some((r) => r.severity === "critical" || r.severity === "high") ? "bad" : undefined} />
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-6">
@@ -87,7 +102,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             )}
           </Card>
 
-          <Card id="health" title="Health breakdown" subtitle={`Weighted score as of ${fmtDate(h.asOf)}. Components without enough data are excluded and lower completeness; they are never counted as healthy.`} actions={<Link href="/calculations#health" className="text-xs">Method →</Link>}>
+          <Card id="health" title="Health breakdown" subtitle={`Weighted score as of ${fmtDate(h.asOf)}. Components without enough data are excluded and lower completeness; they are never counted as healthy.`} actions={<CardLink href="/calculations#health">Method</CardLink>}>
             <div className="mb-3 flex flex-wrap items-center gap-4 text-sm">
               <span>
                 Score <strong className="text-lg tabular-nums">{h.score ?? "—"}</strong>/100
@@ -204,7 +219,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             )}
           </Card>
 
-          <Card title="Risk signals" subtitle="Inferred from communications. Confidence describes evidence strength, not a probability." actions={<Link href={`/signals?account=${acc.id}`} className="text-xs">All signals →</Link>}>
+          <Card id="signals" title="Risk signals" subtitle="Inferred from communications. Confidence describes evidence strength, not a probability." actions={<Link href={`/signals?account=${acc.id}`} className="text-xs">All signals →</Link>}>
             {openRisks.length === 0 ? <p className="text-sm text-ink-muted">No open risk signals.</p> : <ul className="divide-y divide-line">{openRisks.map((s) => <SignalRow key={s.id} ws={ws} s={s} />)}</ul>}
             {positives.length > 0 && (
               <div className="mt-4 border-t border-line pt-3">
@@ -259,7 +274,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
           )}
 
           {ws.profile.modules.invoices && (ws.caps.viewCompanyFinance || ws.caps.viewProjectCosts) && (
-            <Card title="Invoices and payments" padded={false} subtitle={pay && pay.avgDaysLate !== null ? `Observed payment behavior: on average ${pay.avgDaysLate} days ${pay.avgDaysLate >= 0 ? "after" : "before"} due, across ${pay.sample} paid invoices.` : "No paid invoices to infer payment behavior."}>
+            <Card id="invoices" title="Invoices and payments" padded={false} subtitle={pay && pay.avgDaysLate !== null ? `Observed payment behavior: on average ${pay.avgDaysLate} days ${pay.avgDaysLate >= 0 ? "after" : "before"} due, across ${pay.sample} paid invoices.` : "No paid invoices to infer payment behavior."}>
               {invoices.length === 0 ? (
                 <div className="p-4 text-sm text-ink-muted">No invoices.</div>
               ) : (

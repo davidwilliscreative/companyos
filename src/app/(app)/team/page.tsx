@@ -10,7 +10,7 @@ import { viewHelpers } from "@/lib/view";
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
 function heat(pct: number) {
-  if (pct === 0) return "bg-[#f1f1ed] text-ink-muted";
+  if (pct === 0) return "bg-canvas text-ink-muted";
   if (pct > 1.05) return "bg-bad text-white";
   if (pct > 0.9) return "bg-warn-soft text-warn";
   if (pct >= 0.5) return "bg-good-soft text-good";
@@ -75,8 +75,8 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
                 const missing = cap.missingTimesheets.find((m) => m.personId === pc.person.id);
                 return (
                   <tr key={pc.person.id} id={pc.person.id} className="scroll-mt-20 target:bg-accent-soft">
-                    <td className="td">
-                      <div className="font-medium">{pc.person.name}</div>
+                    <td className="td min-w-[180px]">
+                      <div className="whitespace-nowrap font-medium">{pc.person.name}</div>
                       <div className="text-xs text-ink-muted">
                         {pc.person.title}
                         {pc.person.type === "contractor" && <Badge tone="purple">Contractor</Badge>}
@@ -102,8 +102,8 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
                     {ws.personCosts && <td className="td num">{cost?.annualLoaded !== null && cost?.annualLoaded !== undefined ? v.money(cost.annualLoaded, { compact: true }) : <span className="text-xs text-ink-muted">{pc.person.type === "contractor" ? "—" : "missing"}</span>}</td>}
                     {pc.upcoming.weeks.map((w) => (
                       <td key={w.week} className="border-b border-line px-0.5 py-1">
-                        <div className={`rounded px-1 py-0.5 text-center text-[10px] tabular-nums ${heat(w.pct)}`} title={`${w.planned} h planned (${Math.round(w.pct * 100)}%)`}>
-                          {w.pct ? `${Math.round(w.pct * 100)}` : "·"}
+                        <div className={`rounded-md px-1 py-1 text-center text-[10px] font-medium tabular-nums ${Number.isFinite(w.pct) ? heat(w.pct) : w.planned > 0 ? "bg-bad text-white" : "bg-canvas text-ink-faint"}`} title={Number.isFinite(w.pct) ? `${w.planned} h planned (${Math.round(w.pct * 100)}%)` : `${w.planned} h planned while on approved time off`}>
+                          {!Number.isFinite(w.pct) ? (w.planned > 0 ? "Off!" : "Off") : w.pct ? `${Math.round(w.pct * 100)}` : "·"}
                         </div>
                       </td>
                     ))}
@@ -113,7 +113,7 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
             </tbody>
           </table>
         </div>
-        <p className="px-4 py-2 text-[11px] text-ink-muted">Weekly cells show planned hours as % of capacity. Red = over 105%. Planned load comes from assignments; actual load comes from timesheets.</p>
+        <p className="px-5 py-3 text-xs text-ink-muted">Weekly cells show planned hours as % of capacity. Red = over 105%. “Off” = approved time off; “Off!” = work planned during time off. Planned load comes from assignments; actual load comes from timesheets.</p>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">

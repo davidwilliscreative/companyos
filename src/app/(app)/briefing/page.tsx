@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AttentionList, EvidenceLinks } from "@/components/blocks";
-import { Card, HealthBadge, Notice, PageHeader } from "@/components/ui";
+import { Card, HealthBadge, Notice, PageHeader, CardLink } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
 import { addDays, daysBetween, fmtDate, relativeDays } from "@/lib/dates";
 import { fmtPct } from "@/lib/money";
@@ -127,7 +127,7 @@ export default async function BriefingPage() {
             </ul>
           )}
         </Card>
-        <Card title="Actions due this week" actions={<Link href="/actions?status=overdue" className="text-xs">Overdue →</Link>}>
+        <Card title="Actions due this week" actions={<CardLink href="/actions?status=overdue">Overdue</CardLink>}>
           {dueActions.length === 0 ? (
             <p className="text-sm text-ink-muted">None.</p>
           ) : (

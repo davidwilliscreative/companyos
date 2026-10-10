@@ -128,7 +128,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
         </Notice>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:gap-4">
         {mode === "subscription" && <Stat label="ARR" value={v.money(arr, { compact: true })} sub="Active subscriptions × 12" kind="calculated" />}
         <Stat label={mode === "subscription" ? "Recognized revenue" : "Earned revenue"} value={v.money(s.earnedRevenue, { compact: true })} sub={mode === "subscription" ? "Subscription months in period" : "Work performed in period"} kind="calculated" />
         {mode === "delivery" && <Stat label="Delivery margin" value={fmtPct(s.deliveryMargin)} sub={`${v.money(s.deliveryProfit, { compact: true })} delivery profit`} kind="calculated" href="#reconciliation" />}
@@ -141,7 +141,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
       {company && fin.monthly.length > 0 && (
         <div className="grid gap-6 xl:grid-cols-2">
           <Card title={mode === "subscription" ? "Revenue and direct cost by month" : "Earned revenue, direct cost and margin by month"}>
-            <RevenueChart data={fin.monthly} symbol={sym} title="Monthly revenue and margin" />
+            <RevenueChart data={fin.monthly} symbol={sym} title="Earned revenue vs direct cost by month" stacked />
           </Card>
           <Card id="billing" title="Earned vs invoiced vs collected" subtitle="Timing differences are work in progress (earned, not invoiced) and receivables (invoiced, not collected)">
             <BillingChart data={fin.monthly} symbol={sym} />
@@ -338,7 +338,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
                 <Link href={`/accounts/${r.accountId}`} className="truncate">
                   {v.account(r.accountId)}
                 </Link>
-                <div className="h-2 rounded-full bg-[#ecece7]">
+                <div className="h-2 rounded-full bg-line">
                   <div className="h-2 rounded-full bg-accent" style={{ width: `${Math.round(r.share * 100)}%` }} />
                 </div>
                 <span className="text-right tabular-nums">{v.money(r.revenue, { compact: true })}</span>
