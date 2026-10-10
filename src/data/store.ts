@@ -54,8 +54,24 @@ export function createMemoryStore(initial: DemoState = emptyState()): StateStore
   };
 }
 
-let singleton: StateStore | null = null;
-export function getStore(): StateStore {
-  if (!singleton) singleton = createFileStore();
-  return singleton;
+/**
+ * A per-request store. Reads and writes are synchronous against a snapshot, so the mutation and
+ * calculation code stays the same for every backend; `flush` saves any change.
+ */
+export interface RequestStore extends StateStore {
+  flush(): Promise<void>;
+}
+
+export class ConflictError extends Error {
+  constructor() {
+    super("Someone else saved a change at the same moment. Please try again.");
+  }
+}
+
+let fileStore: StateStore | null = null;
+/** Local demo backend: the JSON file. Writes land immediately, so flush has nothing to do. */
+export function localRequestStore(): RequestStore {
+  if (!fileStore) fileStore = createFileStore();
+  const s = fileStore;
+  return { read: () => s.read(), write: (x) => s.write(x), reset: () => s.reset(), flush: async () => {} };
 }

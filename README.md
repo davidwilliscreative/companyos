@@ -2,7 +2,7 @@
 
 A company intelligence and operating platform for a CEO who is not in day-to-day execution. It answers "what needs my attention, why, and what should happen next?" across client health, delivery, profitability, cash, capacity, renewals and expansion, and lets the CEO drill into any account and ask questions about it.
 
-> **This is a demo, not a production system.** All data is synthetic. Every connector status is simulated. The assistant is a deterministic simulation; no AI service is connected. Authentication is a role switcher, not real sign-in.
+> **This is a demo, not a production system.** All data is synthetic. Every connector status is simulated. The assistant is a deterministic simulation; no AI service is connected. Locally, authentication is a role switcher; the hosted version uses Google sign-in with an approved-email list.
 
 ## Setup
 
@@ -24,7 +24,11 @@ npm run build && npm start
 npm run ask -- executive agency "Which accounts need attention this week, and why?"
 ```
 
-Demo edits are stored in `.data/demo-state.json`. Use **Settings & demo → Reset demo data**, or delete that file, to return to the seed.
+Run locally like this, there is no sign-in and demo edits are stored in `.data/demo-state.json`. Use **Settings & demo → Reset demo data**, or delete that file, to return to the seed.
+
+### Hosted version (sign-in and shared database)
+
+Setting the three values in `.env.example` turns on Google sign-in (only emails listed in Supabase's `members` table get in, with the role stored there) and saves edits in Supabase instead of the local file. Executives can still preview other roles; everyone else is fixed to theirs. Step-by-step hosting on Vercel with a custom domain is in [docs/deploy.md](docs/deploy.md).
 
 ## Five-minute walkthrough
 
@@ -62,7 +66,7 @@ Agency seed: 10 clients, 15 employees and 3 contractors, 18 projects, 28 tasks, 
 | All calculations (labor cost, earned revenue, margins, utilization, AR aging, cash forecast, concentration, health) | Connector statuses, sync times, scopes and failures | Live ClickUp, Gmail, Slack, accounting and Sheets connectors |
 | Navigation, filters, drilldowns, evidence links | Source data (synthetic seed) | Real authentication (SSO), tenant isolation |
 | Persistent actions, comments, signal reviews, opportunity estimates, applied scenarios, mapping decisions, imports, currency | The assistant (deterministic, rule-based) | Server-side Claude provider |
-| Role permissions in the data layer, including assistant retrieval | Sign-in (role switcher) | Encryption at rest, retention controls |
+| Role permissions in the data layer, including assistant retrieval | Sign-in locally (role switcher); hosted uses Google sign-in | Encryption at rest, retention controls |
 | Sheets import with mapping, validation, idempotent re-import | Google Sheets content | Scheduled refresh, notifications |
 
 ## Calculation assumptions
@@ -131,9 +135,9 @@ Key boundaries:
 
 ## Known limitations
 
-- Single-process JSON store; concurrent writers may overwrite each other. Fine for a local demo only.
+- Demo edits are one shared overlay (a JSON file locally, one Supabase row when hosted, with conflict detection). Connector data will need normalized tables.
 - The simulated assistant is rule-based. It handles the listed question types and common variations, not open-ended conversation.
 - Signal detection is keyword- and rule-based over synthetic messages. It is explainable but not a validated model.
 - Cash forecast and revenue recognition are simplified management views, not accounting.
 - Health trend compares now with 30 days earlier rather than a full time series.
-- The role switcher is not security. Anyone with the app can switch roles.
+- Locally, the role switcher is not security. Hosted, roles come from the members table, but permissions are enforced in application code over the demo data rather than by per-record database policies.

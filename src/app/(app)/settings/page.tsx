@@ -1,12 +1,13 @@
-import { CurrencyForm, ResetButton } from "@/components/forms";
+import { CurrencyForm, MembersManager, ResetButton } from "@/components/forms";
 import { Card, DefList, PageHeader } from "@/components/ui";
-import { getWorkspace } from "@/data/session";
-import { getStore } from "@/data/store";
+import { getMember } from "@/data/member";
+import { getWorkspace, readStore } from "@/data/session";
 import { PROFILES } from "@/domain/profiles";
 import type { RoleId } from "@/domain/types";
 import { fmtDate } from "@/lib/dates";
 import { DEMO_FX_TO_USD } from "@/lib/money";
 import { ROLES } from "@/lib/permissions";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 const CAP_LABELS: [keyof (typeof ROLES)["executive"]["caps"], string][] = [
   ["allAccounts", "All accounts"],
@@ -23,16 +24,26 @@ const CAP_LABELS: [keyof (typeof ROLES)["executive"]["caps"], string][] = [
 
 export default async function SettingsPage() {
   const ws = await getWorkspace();
-  const audit = getStore()
+  const audit = (await readStore())
     .read()
     .audit.filter((x) => x.orgId === ws.org.id && (ws.caps.allAccounts || x.actor === ws.user.id))
     .slice(-15)
     .reverse();
   const roles = Object.keys(ROLES) as RoleId[];
+  const member = await getMember();
+  const members =
+    member?.role === "executive"
+      ? ((await supabaseAdmin().from("members").select("email, role, display_name").order("email")).data ?? []).map((x) => ({ email: x.email as string, role: x.role as RoleId, displayName: x.display_name as string | null }))
+      : null;
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings and demo controls" subtitle="Demo session settings. The role switcher simulates who is signed in; it is not authentication." />
+      <PageHeader title="Settings and demo controls" subtitle={member ? `Signed in as ${member.email} (${ROLES[member.role].label}). ${member.role === "executive" ? "As an executive you can preview other roles from the header." : ""}` : "Local demo. The role switcher simulates who is signed in; it is not authentication."} />
+      {members && member && (
+        <Card title="People with access" subtitle="Only these Google accounts can sign in. Their role decides what data is loaded for them.">
+          <MembersManager members={members} me={member.email} />
+        </Card>
+      )}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Organization">
           <DefList
@@ -58,8 +69,8 @@ export default async function SettingsPage() {
           </div>
         </Card>
         <Card title="Reset demo">
-          <p className="mb-3 text-sm text-ink-soft">Edits (actions, comments, signal reviews, opportunity estimates, applied scenarios, mapping decisions, imports and currency) are stored locally in <code>.data/demo-state.json</code>. Resetting restores the original synthetic data for all three profiles.</p>
-          <ResetButton />
+          <p className="mb-3 text-sm text-ink-soft">Edits (actions, comments, signal reviews, opportunity estimates, applied scenarios, mapping decisions, imports and currency) are {member ? "saved in the shared database, so everyone with access sees them" : <>stored locally in <code>.data/demo-state.json</code></>}. Resetting restores the original synthetic data for all three profiles.</p>
+          {!member || member.role === "executive" ? <ResetButton /> : <p className="text-xs text-ink-muted">Only executives can reset the shared demo data.</p>}
         </Card>
       </div>
 

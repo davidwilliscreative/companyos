@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { createActionAction, decideMappingAction, editOpportunityAction, resetDemoAction, reviewSignalAction, setCurrencyAction, updateActionAction } from "@/app/actions";
-import type { Action, CurrencyCode, EvidenceLink, Opportunity, ReviewStatus, Severity } from "@/domain/types";
+import { addMemberAction, createActionAction, decideMappingAction, editOpportunityAction, removeMemberAction, resetDemoAction, reviewSignalAction, setCurrencyAction, updateActionAction } from "@/app/actions";
+import type { Action, CurrencyCode, EvidenceLink, Opportunity, ReviewStatus, RoleId, Severity } from "@/domain/types";
+
+const ROLE_LABELS: Record<RoleId, string> = { executive: "Executive", finance: "Finance", account_owner: "Account owner", admin: "Administrator" };
 
 type Res = { ok: true } | { ok: false; error: string };
 
@@ -300,6 +302,77 @@ export function ResetButton() {
           </button>
         </div>
       )}
+      <Feedback error={error} message={message} />
+    </div>
+  );
+}
+
+export function MembersManager({ members, me }: { members: { email: string; role: RoleId; displayName: string | null }[]; me: string }) {
+  const { pending, error, message, run } = useMutation();
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<RoleId>("account_owner");
+  return (
+    <div>
+      <table className="w-full">
+        <thead>
+          <tr>
+            <th className="th">Email</th>
+            <th className="th">Role</th>
+            <th className="th" />
+          </tr>
+        </thead>
+        <tbody>
+          {members.map((x) => (
+            <tr key={x.email}>
+              <td className="td">
+                {x.displayName && <div className="font-medium">{x.displayName}</div>}
+                <div className="text-xs text-ink-soft">{x.email}</div>
+              </td>
+              <td className="td text-sm">{ROLE_LABELS[x.role]}</td>
+              <td className="td text-right">
+                {x.email !== me && (
+                  <button className="btn py-1 text-xs" disabled={pending} onClick={() => run(() => removeMemberAction(x.email), `Removed ${x.email}.`)}>
+                    Remove
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <form
+        className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end"
+        onSubmit={(e) => {
+          e.preventDefault();
+          run(() => addMemberAction(email, role, name), `${email.trim().toLowerCase()} can now sign in.`, () => {
+            setEmail("");
+            setName("");
+          });
+        }}
+      >
+        <div>
+          <label className="label" htmlFor="m-email">Email (their Google account)</label>
+          <input id="m-email" type="email" required className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div>
+          <label className="label" htmlFor="m-name">Name (optional)</label>
+          <input id="m-name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label className="label" htmlFor="m-role">Role</label>
+          <select id="m-role" className="input" value={role} onChange={(e) => setRole(e.target.value as RoleId)}>
+            {(Object.keys(ROLE_LABELS) as RoleId[]).map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABELS[r]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button className="btn btn-primary" disabled={pending}>
+          {pending ? "Saving…" : "Add or update"}
+        </button>
+      </form>
       <Feedback error={error} message={message} />
     </div>
   );

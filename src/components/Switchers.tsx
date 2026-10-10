@@ -11,9 +11,10 @@ interface Props {
   period: string;
   periods: { key: string; label: string }[];
   roleUser: string;
+  canSwitchRole: boolean;
 }
 
-export function Switchers({ profile, role, period, periods, roleUser }: Props) {
+export function Switchers({ profile, role, period, periods, roleUser, canSwitchRole }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<void>) =>
@@ -29,13 +30,13 @@ export function Switchers({ profile, role, period, periods, roleUser }: Props) {
         <option value="saas">Profile: SaaS startup</option>
         <option value="enterprise">Profile: Larger organization</option>
       </select>
-      <label className="sr-only" htmlFor="sw-role">Demo role</label>
-      <select id="sw-role" className="input w-auto py-1 text-xs" value={role} onChange={(e) => run(() => setRole(e.target.value as RoleId))} title={`Viewing as ${roleUser}. Demo role switcher, not authentication.`}>
+      {canSwitchRole && <label className="sr-only" htmlFor="sw-role">Demo role</label>}
+      {canSwitchRole && <select id="sw-role" className="input w-auto py-1 text-xs" value={role} onChange={(e) => run(() => setRole(e.target.value as RoleId))} title={`Viewing as ${roleUser}. Preview of what this role can see.`}>
         <option value="executive">Role: Executive</option>
         <option value="finance">Role: Finance</option>
         <option value="account_owner">Role: Account owner</option>
         <option value="admin">Role: Administrator</option>
-      </select>
+      </select>}
       <label className="sr-only" htmlFor="sw-period">Reporting period</label>
       <select id="sw-period" className="input w-auto py-1 text-xs" value={period} onChange={(e) => run(() => setPeriod(e.target.value))}>
         {periods.map((p) => (
