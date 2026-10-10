@@ -38,49 +38,53 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ? ["Which customers need attention this week, and why?", "Which renewals are at risk?", "Why did Quarry Health's health decline?", "Where do we have credible expansion opportunities?", "What is blocking the SSO launch?", "What changed since last week?"]
         : ["Which business units need attention this week?", "Which initiatives are over budget?", "What is blocking the field service pilot?", "What changed since last week?", "Can we take on a new initiative given current staffing?"];
 
+  const switcherProps = { profile: ws.ctx.profileId, role: ws.ctx.role, period: ws.analysis.period.key, periods: reportingPeriods(ws.data).map((p) => ({ key: p.key, label: p.label })), roleUser: ws.user.name, canSwitchRole: canSwitchRole(member) };
+
   return (
     <>
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">
           Skip to content
         </a>
         <div className="lg:flex">
-          <Nav items={items} orgName={ws.org.name} profileLabel={ws.profile.label} />
+          <Nav items={items} orgName={ws.org.name} profileLabel={ws.profile.label} controls={<Switchers {...switcherProps} show={["profile", "role"]} variant="sidebar" />} />
           <div className="min-w-0 flex-1">
-            <div className="border-b border-[#f1dfb8] bg-warn-soft px-4 py-1.5 text-center text-xs text-warn">
-              <strong>Demo.</strong> Synthetic data only. All connector statuses are simulated and the assistant is a deterministic simulation (no AI service connected). Not production-ready.
-            </div>
-            <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-canvas/95 px-4 py-2.5 backdrop-blur lg:px-8">
-              <div className="flex flex-wrap items-center gap-3 text-xs text-ink-soft">
-                <span>
-                  Demo date <strong className="text-ink">{fmtDate(ws.org.demoDate)}</strong>
-                </span>
-                <span aria-hidden="true">·</span>
-                <span>
-                  Viewing as <strong className="text-ink">{ws.user.name}</strong> ({ROLES[ws.ctx.role].label})
-                </span>
-                <span aria-hidden="true">·</span>
-                {member && (
-                  <>
-                    <span>
-                      Signed in as <strong className="text-ink">{member.displayName ?? member.email}</strong>{" "}
-                      <a href="/auth/sign-out" className="text-ink-soft underline">
-                        Sign out
-                      </a>
-                    </span>
-                    <span aria-hidden="true">·</span>
-                  </>
-                )}
-                <Link href="/integrations" className={degraded.length ? "text-warn" : "text-ink-soft"}>
-                  {degraded.length ? `⚠︎ ${degraded.length} data source${degraded.length === 1 ? "" : "s"} stale or degraded` : "All sources fresh (simulated)"}
-                </Link>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Switchers profile={ws.ctx.profileId} role={ws.ctx.role} period={ws.analysis.period.key} periods={reportingPeriods(ws.data).map((p) => ({ key: p.key, label: p.label }))} roleUser={ws.user.name} canSwitchRole={canSwitchRole(member)} />
-                <AssistantDrawer suggestions={suggestions} />
+            <header className="relative z-30 border-b border-line bg-canvas/80 backdrop-blur-xl lg:sticky lg:top-0">
+              <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 lg:px-10">
+                <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-soft">
+                  <span title="Synthetic data only. All connector statuses are simulated and the assistant is a deterministic simulation (no AI service connected). Not production-ready." className="inline-flex items-center gap-1.5 rounded-full bg-warn-soft px-2.5 py-1 text-xs font-semibold text-warn ring-1 ring-inset ring-warn-line">
+                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warn" />
+                    Demo · synthetic data
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs ring-1 ring-inset ring-line">
+                    <span className="text-ink-muted">Today</span>
+                    <strong className="font-semibold text-ink">{fmtDate(ws.org.demoDate)}</strong>
+                  </span>
+                  <span className="hidden items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs ring-1 ring-inset ring-line 2xl:inline-flex">
+                    <span className="text-ink-muted">Viewing as</span>
+                    <strong className="font-semibold text-ink">{ws.user.name}</strong>
+                    <span className="text-ink-muted">· {ROLES[ws.ctx.role].label}</span>
+                  </span>
+                  <Link href="/integrations" className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs no-underline ring-1 ring-inset ${degraded.length ? "bg-warn-soft/60 text-warn ring-warn-line hover:text-warn" : "bg-surface text-ink-soft ring-line hover:text-ink"}`}>
+                    <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${degraded.length ? "bg-warn" : "bg-good"}`} />
+                    {degraded.length ? `${degraded.length} source${degraded.length === 1 ? "" : "s"} stale` : "Sources fresh"}
+                  </Link>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Switchers {...switcherProps} show={["period"]} />
+                  <AssistantDrawer suggestions={suggestions} />
+                  {member && (
+                    <a href="/auth/sign-out" title={`Signed in as ${member.email}. Sign out`} className="group inline-flex h-9 items-center gap-2 rounded-full bg-surface pl-1 pr-3 text-xs font-medium text-ink-soft no-underline ring-1 ring-inset ring-line hover:text-ink">
+                      <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-full bg-ink text-[10px] font-semibold text-white">
+                        {(member.displayName ?? member.email).slice(0, 2).toUpperCase()}
+                      </span>
+                      Sign out
+                    </a>
+                  )}
+                </div>
               </div>
             </header>
-            <main id="main" className="mx-auto max-w-[1400px] px-4 py-6 lg:px-8">
-              {ws.scopeNote && <div className="mb-4 rounded-lg border border-line bg-white px-3 py-2 text-xs text-ink-soft">{ws.scopeNote} Other accounts are not loaded for this role.</div>}
+            <main id="main" className="mx-auto max-w-[1400px] px-4 pb-16 pt-8 lg:px-10 lg:pt-10">
+              {ws.scopeNote && <div className="mb-6 rounded-xl border border-accent-line bg-accent-soft/60 px-4 py-2.5 text-[13px] text-ink-soft">{ws.scopeNote} Other accounts are not loaded for this role.</div>}
               {children}
             </main>
           </div>

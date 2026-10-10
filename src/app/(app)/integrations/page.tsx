@@ -83,7 +83,7 @@ export default async function IntegrationsPage() {
               </div>
             )}
             {c.failures.length > 0 && (
-              <div className="mt-3 rounded-lg border border-[#efcdc7] bg-bad-soft p-2 text-xs text-bad">
+              <div className="mt-3 rounded-lg border border-bad-line bg-bad-soft p-2 text-xs text-bad">
                 <div className="font-medium">Recent failures</div>
                 <ul>
                   {c.failures.map((f) => (

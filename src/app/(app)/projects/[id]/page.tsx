@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { peopleOptions } from "@/components/blocks";
 import { ActionForm } from "@/components/forms";
 import { ScenarioCalculator } from "@/components/ScenarioCalculator";
-import { Badge, Card, DefList, KindTag, MilestoneBadge, Notice, PageHeader, Restricted, SeverityBadge, SourceTag, Stat } from "@/components/ui";
+import { Badge, Card, DefList, KindTag, MilestoneBadge, Notice, PageHeader, Restricted, SeverityBadge, SourceTag, Stat, CardLink } from "@/components/ui";
 import { scenarioBaseFor } from "@/data/scenario-base";
 import { getWorkspace } from "@/data/session";
 import { addDays, fmtDate, fmtMonth, relativeDays } from "@/lib/dates";
@@ -87,7 +87,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       {!ws.caps.viewProjectCosts ? (
         <Restricted what="Project costs, revenue and margins are not available to your role." />
       ) : f ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:gap-4">
           {internal ? (
             <>
               <Stat label="Approved budget" value={v.money(f.cost.budget, { compact: true })} kind="observed" />
@@ -109,7 +109,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       ) : null}
 
       {showMoney && (
-        <Card id="calculation" title="How this forecast is calculated" subtitle="Every figure is traceable to time entries, rates, contracts and expenses" actions={<Link href="/calculations" className="text-xs">All formulas →</Link>}>
+        <Card id="calculation" title="How this forecast is calculated" subtitle="Every figure is traceable to time entries, rates, contracts and expenses" actions={<CardLink href="/calculations">All formulas</CardLink>}>
           <p className="mb-3 text-sm text-ink-soft">{f.revenue.basis}</p>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px]">
@@ -267,7 +267,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <Card title="Team and planned hours">
           <table className="w-full">
             <thead>

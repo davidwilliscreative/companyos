@@ -71,7 +71,7 @@ export function ActionForm({
   if (!open)
     return (
       <div>
-        <button className="btn text-xs" onClick={() => setOpen(true)}>
+        <button className="btn h-8 px-3 text-xs" onClick={() => setOpen(true)}>
           + {label}
         </button>
         <Feedback error={error} message={message} />
@@ -79,7 +79,7 @@ export function ActionForm({
     );
   return (
     <form
-      className="space-y-2 rounded-lg border border-line bg-canvas p-3"
+      className="space-y-3 rounded-xl border border-line bg-canvas p-4 text-ink"
       onSubmit={(e) => {
         e.preventDefault();
         run(

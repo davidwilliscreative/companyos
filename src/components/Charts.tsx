@@ -2,7 +2,15 @@
 
 import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-const C = { accent: "#2f5d8a", good: "#2e6b4f", warn: "#c2862a", bad: "#a33a2e", muted: "#9aa1ad", grid: "#ecece7" };
+/** Categorical slots in fixed order (validated for colour-vision deficiency), plus recessive chart chrome. */
+const C = { s1: "#2a78d6", s2: "#eb6834", s3: "#1baf7a", ink: "#0e1015", muted: "#a6aab5", grid: "#eeeef2", axis: "#7c8190", bad: "#be123c" };
+const AXIS = { tick: { fontSize: 11, fill: C.axis }, axisLine: false, tickLine: false } as const;
+const TOOLTIP = {
+  contentStyle: { borderRadius: 12, border: "1px solid #e7e7ec", boxShadow: "0 8px 24px -8px rgba(14,16,21,0.18)", fontSize: 12, padding: "8px 12px" },
+  labelStyle: { color: C.ink, fontWeight: 600, marginBottom: 4 },
+  cursor: { fill: "rgba(14,16,21,0.04)" },
+} as const;
+const LEGEND = { wrapperStyle: { fontSize: 12, paddingTop: 8 }, iconType: "circle" as const, iconSize: 8 };
 
 function compact(sym: string) {
   return (v: number) => {
@@ -21,28 +29,46 @@ export interface MonthDatum {
   margin: number | null;
 }
 
-/** Earned revenue, direct cost and delivery margin by month. */
-export function RevenueChart({ data, symbol, title }: { data: MonthDatum[]; symbol: string; title: string }) {
+/** Earned revenue vs direct cost by month, with delivery margin as its own small chart (one axis each). */
+export function RevenueChart({ data, symbol, title, stacked = false }: { data: MonthDatum[]; symbol: string; title: string; stacked?: boolean }) {
   const fmt = compact(symbol);
+  const margins = data.map((d) => ({ label: d.label, marginPct: d.margin === null ? null : Math.round(d.margin * 100) }));
+  const hasMargin = margins.some((m) => m.marginPct !== null);
   return (
-    <figure>
-      <figcaption className="sr-only">{title}</figcaption>
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data.map((d) => ({ ...d, marginPct: d.margin === null ? null : Math.round(d.margin * 100) }))} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke={C.grid} vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} tickFormatter={(v: string) => v.slice(0, 3)} />
-            <YAxis yAxisId="m" tick={{ fontSize: 11 }} tickFormatter={fmt} width={56} />
-            <YAxis yAxisId="p" orientation="right" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${v}%`} width={40} domain={[-20, 100]} />
-            <Tooltip formatter={(v, name) => (name === "Delivery margin" ? `${v}%` : fmt(Number(v)))} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar yAxisId="m" dataKey="earned" name="Earned revenue" fill={C.accent} radius={[3, 3, 0, 0]} />
-            <Bar yAxisId="m" dataKey="directCost" name="Direct cost" fill={C.muted} radius={[3, 3, 0, 0]} />
-            <Line yAxisId="p" dataKey="marginPct" name="Delivery margin" stroke={C.good} strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-    </figure>
+    <div className={`grid gap-6 ${stacked ? "" : "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"}`}>
+      <figure>
+        <figcaption className="mb-2 text-[13px] font-medium text-ink-soft">{title}</figcaption>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }} barGap={2} barCategoryGap="28%">
+              <CartesianGrid stroke={C.grid} vertical={false} />
+              <XAxis dataKey="label" {...AXIS} tickFormatter={(v: string) => v.slice(0, 3)} />
+              <YAxis {...AXIS} tickFormatter={fmt} width={56} />
+              <Tooltip {...TOOLTIP} formatter={(v) => fmt(Number(v))} />
+              <Legend {...LEGEND} />
+              <Bar dataKey="earned" name="Earned revenue" fill={C.s1} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="directCost" name="Direct cost" fill={C.s2} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </figure>
+      {hasMargin && (
+        <figure>
+          <figcaption className="mb-2 text-[13px] font-medium text-ink-soft">Delivery margin</figcaption>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={margins} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid stroke={C.grid} vertical={false} />
+                <XAxis dataKey="label" {...AXIS} tickFormatter={(v: string) => v.slice(0, 3)} />
+                <YAxis {...AXIS} tickFormatter={(v: number) => `${v}%`} width={44} domain={[0, 100]} />
+                <Tooltip {...TOOLTIP} cursor={{ stroke: C.muted, strokeDasharray: "3 3" }} formatter={(v) => [`${v}%`, "Delivery margin"]} />
+                <Line dataKey="marginPct" name="Delivery margin" stroke={C.ink} strokeWidth={2} dot={{ r: 4, fill: "#fff", strokeWidth: 2 }} activeDot={{ r: 5 }} connectNulls={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </figure>
+      )}
+    </div>
   );
 }
 
@@ -56,13 +82,13 @@ export function BillingChart({ data, symbol }: { data: MonthDatum[]; symbol: str
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={C.grid} vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} tickFormatter={(v: string) => v.slice(0, 3)} />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={fmt} width={56} />
-            <Tooltip formatter={(v) => fmt(Number(v))} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="earned" name="Earned" fill={C.accent} radius={[3, 3, 0, 0]} />
-            <Bar dataKey="invoiced" name="Invoiced" fill={C.warn} radius={[3, 3, 0, 0]} />
-            <Bar dataKey="collected" name="Collected" fill={C.good} radius={[3, 3, 0, 0]} />
+            <XAxis dataKey="label" {...AXIS} tickFormatter={(v: string) => v.slice(0, 3)} />
+            <YAxis {...AXIS} tickFormatter={fmt} width={56} />
+            <Tooltip {...TOOLTIP} formatter={(v) => fmt(Number(v))} />
+            <Legend {...LEGEND} />
+            <Bar dataKey="earned" name="Earned" fill={C.s1} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="invoiced" name="Invoiced" fill={C.s2} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="collected" name="Collected" fill={C.s3} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -79,14 +105,14 @@ export function CashChart({ data, symbol }: { data: { week: string; closing: num
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data.map((d) => ({ ...d, outflowsNeg: -d.outflows }))} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={C.grid} vertical={false} />
-            <XAxis dataKey="week" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} tickFormatter={fmt} width={60} />
-            <Tooltip formatter={(v) => fmt(Number(v))} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <ReferenceLine y={0} stroke={C.bad} />
-            <Bar dataKey="inflows" name="Inflows" fill={C.good} radius={[3, 3, 0, 0]} />
-            <Bar dataKey="outflowsNeg" name="Outflows" fill={C.muted} radius={[0, 0, 3, 3]} />
-            <Line dataKey="closing" name="Closing balance" stroke={C.accent} strokeWidth={2} dot={{ r: 2 }} />
+            <XAxis dataKey="week" {...AXIS} />
+            <YAxis {...AXIS} tickFormatter={fmt} width={60} />
+            <Tooltip {...TOOLTIP} formatter={(v) => fmt(Number(v))} />
+            <Legend {...LEGEND} />
+            <ReferenceLine y={0} stroke={C.bad} strokeDasharray="4 3" />
+            <Bar dataKey="inflows" name="Inflows" fill={C.s1} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="outflowsNeg" name="Outflows" fill={C.s2} radius={[0, 0, 4, 4]} />
+            <Line dataKey="closing" name="Closing balance" stroke={C.ink} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -102,12 +128,12 @@ export function UsageChart({ data }: { data: { label: string; active: number | n
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={C.grid} vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} width={40} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Line dataKey="seats" name="Licensed seats" stroke={C.muted} strokeDasharray="4 3" dot={false} />
-            <Line dataKey="active" name="Active seats" stroke={C.accent} strokeWidth={2} connectNulls={false} />
+            <XAxis dataKey="label" {...AXIS} />
+            <YAxis {...AXIS} width={40} />
+            <Tooltip {...TOOLTIP} />
+            <Legend {...LEGEND} />
+            <Line dataKey="seats" name="Licensed seats" stroke={C.muted} strokeWidth={2} strokeDasharray="4 3" dot={false} />
+            <Line dataKey="active" name="Active seats" stroke={C.s1} strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -120,10 +146,10 @@ export function HealthTrend({ data }: { data: { label: string; score: number | n
     <div className="h-24">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} width={28} />
-          <Tooltip />
-          <Line dataKey="score" name="Health" stroke={C.accent} strokeWidth={2} connectNulls={false} />
+          <XAxis dataKey="label" {...AXIS} tick={{ fontSize: 10, fill: C.axis }} />
+          <YAxis domain={[0, 100]} {...AXIS} tick={{ fontSize: 10, fill: C.axis }} width={28} />
+          <Tooltip {...TOOLTIP} />
+          <Line dataKey="score" name="Health" stroke={C.s1} strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
