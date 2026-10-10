@@ -6,6 +6,8 @@ A company intelligence and operating platform for a CEO who is not in day-to-day
 
 ## Setup
 
+**Not a developer?** Install Node.js (LTS) from https://nodejs.org, then double-click `Start CompanyOS (Mac).command` or `Start CompanyOS (Windows).bat`. The first run installs dependencies; your browser then opens the demo. Close the window to stop it.
+
 Requirements: Node.js 20 or later. No API keys, accounts or external services.
 
 ```bash
