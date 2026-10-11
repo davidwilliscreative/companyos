@@ -413,7 +413,7 @@ export interface Opportunity {
 }
 
 export interface EvidenceLink {
-  type: "account" | "project" | "milestone" | "task" | "invoice" | "message" | "thread" | "signal" | "calculation" | "person" | "opportunity";
+  type: "account" | "project" | "milestone" | "task" | "invoice" | "message" | "thread" | "signal" | "calculation" | "person" | "opportunity" | "issue";
   id: ID;
   label?: string;
 }

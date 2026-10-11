@@ -29,6 +29,8 @@ export function hrefFor(link: EvidenceLink, data?: Pick<Dataset, "milestones" | 
       return `/signals?tab=opportunities#${link.id}`;
     case "person":
       return `/team#${link.id}`;
+    case "issue":
+      return `/issues#${link.id}`;
     case "calculation": {
       const [kind, id] = link.id.split(":");
       if (kind === "margin") return `/projects/${id}#calculation`;

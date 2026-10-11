@@ -184,6 +184,16 @@ export function buildWorkspace(ctx: RequestContext, store: StateStore, opts: { c
         let item = { ...i, links: i.links.filter(linkAllowed) };
         if (!commercial && i.impactValue !== null && ["renewal", "schedule", "opportunity"].includes(i.kind)) item = { ...item, impactValue: null, impactLabel: i.kind === "renewal" ? "Contract value restricted for your role" : i.kind === "opportunity" ? "Estimate restricted for your role" : "Schedule" };
         if (!commercial && i.kind === "action") item = { ...item, impactLabel: redactImpact(i.impactLabel) };
+        if (i.kind === "capacity" && !caps.allAccounts) {
+          // Name only permitted projects; everything else is "other work".
+          const pc = analysis.capacity.overallocated.find((x) => i.links.some((l) => l.type === "person" && l.id === x.person.id));
+          if (pc) {
+            const mine = pc.projects.filter((x) => projectIds.has(x.projectId)).map((x) => full.projects.find((p) => p.id === x.projectId)?.name);
+            const other = pc.projects.length - mine.length;
+            const blocked = data.tasks.filter((t) => t.assigneeId === pc.person.id && t.status === "blocked").length;
+            item = { ...item, why: `Assigned to ${pc.projects.length} active projects (${[...mine, ...(other ? [`${other} other project${other === 1 ? "" : "s"}`] : [])].join(", ")}).${blocked ? ` ${blocked} of your task(s) blocked waiting on them.` : ""}`, links: item.links.filter((l) => l.type !== "task" || data.tasks.some((t) => t.id === l.id)) };
+          }
+        }
         if (i.kind === "account" && i.accountId && health[i.accountId]) {
           // Rebuild the explanation from the role's (possibly redacted) health factors.
           const top = health[i.accountId].components.flatMap((c) => c.factors).filter((f) => f.effect < 0 && f.label !== RESTRICTED_FACTOR).sort((x, y) => x.effect - y.effect).slice(0, 2);
@@ -196,6 +206,7 @@ export function buildWorkspace(ctx: RequestContext, store: StateStore, opts: { c
     capacity: {
       ...analysis.capacity,
       people: analysis.capacity.people.map((pc) => ({ ...pc, projects: pc.projects.map((x) => (projectIds.has(x.projectId) ? x : { ...x, projectId: "__other__" })) })),
+      overallocated: analysis.capacity.overallocated.map((pc) => ({ ...pc, projects: pc.projects.map((x) => (projectIds.has(x.projectId) ? x : { ...x, projectId: "__other__" })) })),
       gaps: analysis.capacity.gaps.filter((g) => projectIds.has(g.projectId)),
     },
   };

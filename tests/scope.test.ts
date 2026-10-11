@@ -19,7 +19,7 @@ describe("administrator data boundary", () => {
   });
 
   it("gets no money in attention impacts, action text or changes", () => {
-    for (const a of admin.analysis.attention) if (a.impact) expect(a.impact.value ?? null).toBeNull();
+    for (const a of admin.analysis.attention) expect(a.impactValue).toBeNull();
     expect(adminPayload).not.toMatch(/\$\d/);
   });
 
@@ -48,7 +48,15 @@ describe("account owner boundary", () => {
     expect(sofia.data.accounts.every((a) => a.ownerId === sofia.user.id)).toBe(true);
     for (const i of sofia.data.invoices) expect(own.has(i.accountId)).toBe(true);
     for (const s of sofia.analysis.signals) expect(own.has(s.accountId)).toBe(true);
-    expect(sofia.finance?.company ?? null).toBeNull();
+    expect(sofia.finance?.scope).toBe("own_accounts");
+    expect(sofia.finance?.cash ?? null).toBeNull();
+    expect(sofia.personCosts).toBeNull();
+  });
+
+  it("sees other clients' work only as 'Other work' in staffing", () => {
+    const names = new Set(ws("agency", "executive").data.accounts.filter((a) => !own.has(a.id)).flatMap((a) => [a.name, a.name.split(" ")[0]]));
+    const text = JSON.stringify({ att: sofia.analysis.attention, cap: sofia.analysis.capacity.overallocated });
+    for (const n of names) expect(text, n).not.toContain(n);
   });
 });
 
