@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ProfileId, RoleId } from "@/domain/types";
 import { homeFor } from "@/lib/home";
+import { interpretAccount, interpretProject } from "@/lib/interpret";
+import { fmtPts } from "@/lib/money";
 import { buildIssues } from "@/lib/issues";
 import { ws } from "./helpers";
 
@@ -101,5 +103,51 @@ describe("role homes", () => {
     const others = ws("agency", "executive").data.accounts.filter((a) => !sofia.data.accounts.some((x) => x.id === a.id));
     const text = JSON.stringify(homeFor(sofia));
     for (const a of others) expect(text, a.name).not.toContain(a.name);
+  });
+});
+
+describe("status by dimension", () => {
+  const w = ws("agency", "executive");
+  const issues = buildIssues(w);
+  const dim = (accountId: string, key: string) => interpretAccount(w, accountId, issues).dimensions.find((d) => d.key === key)!;
+
+  it("shows Brightwater's relationship at risk even though the overall score says watch", () => {
+    expect(w.analysis.health.a_brightwater.status).toBe("watch");
+    expect(dim("a_brightwater", "relationship").level).toBe("at_risk");
+    expect(interpretAccount(w, "a_brightwater", issues).overall).toBe("at_risk");
+  });
+
+  it("does not call Harbor & Pine healthy while its project is late and loss-making", () => {
+    expect(w.analysis.health.a_harbor.status).toBe("healthy");
+    expect(dim("a_harbor", "delivery").level).toBe("at_risk");
+    expect(dim("a_harbor", "financial").level).toBe("at_risk");
+    expect(dim("a_harbor", "financial").reason).toContain("−55.1 pts");
+  });
+
+  it("flags Orchard's overdue invoice in the financial dimension", () => {
+    expect(w.analysis.health.a_orchard.status).toBe("healthy");
+    expect(dim("a_orchard", "financial").level).toBe("watch");
+  });
+
+  it("never reads missing data as healthy", () => {
+    expect(dim("a_lumen", "data").level).toBe("at_risk");
+    expect(dim("a_lumen", "data").status).toBe("Low");
+  });
+
+  it("restricts the financial dimension for the administrator", () => {
+    const admin = ws("agency", "admin");
+    expect(interpretAccount(admin, "a_harbor", buildIssues(admin)).dimensions.find((d) => d.key === "financial")!.level).toBe("restricted");
+    expect(interpretProject(admin, "pr_harbor_web", buildIssues(admin)).dimensions.find((d) => d.key === "financial")!.level).toBe("restricted");
+  });
+
+  it("formats margin gaps in percentage points", () => {
+    expect(fmtPts(-0.101 - 0.45)).toBe("−55.1 pts");
+    expect(fmtPts(0.02)).toBe("+2.0 pts");
+  });
+
+  it("treats praise elsewhere as context, not contradiction", () => {
+    const s = w.analysis.signals.find((x) => x.id === "sig_a_brightwater_renewal_risk")!;
+    expect(s.counterEvidence.some((e) => e.excerpt.includes("Great work") && e.relation === "context")).toBe(true);
+    expect(s.confidence).toBe("high");
   });
 });

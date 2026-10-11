@@ -536,9 +536,8 @@ export function buildIssues(ws: Workspace): Issue[] {
     const id = `${ID_PREFIX[prefix]}${recId}`;
     const d = describe(kind, key, items, ws);
     const accountIds = uniq(items.map((i) => i.accountId).filter(Boolean) as ID[]);
-    const projectIds = uniq(
-      [...items.map((i) => i.projectId), ...(kind === "staffing" ? (ws.analysis.capacity.overallocated.find((x) => x.person.id === recId)?.projects.map((x) => x.projectId) ?? []) : [])].filter((x): x is ID => !!x && x !== "__other__"),
-    );
+    // Affected = where the situation shows up (for staffing: projects with blocked work), not every assignment.
+    const projectIds = uniq(items.map((i) => i.projectId).filter((x): x is ID => !!x && x !== "__other__"));
     for (const pid of projectIds) {
       const acc = ws.data.projects.find((p) => p.id === pid)?.accountId;
       if (acc && !accountIds.includes(acc)) accountIds.push(acc);

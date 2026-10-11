@@ -358,6 +358,13 @@ export interface Evidence {
   author: string;
   authorSide: "client" | "internal";
   matched: string[];
+  /**
+   * Only on counter-evidence. "contradicts": a later message in the same conversation, or a
+   * directly opposite statement (interest in more work against cancellation risk); it lowers
+   * confidence. "context": opposite-tone remarks elsewhere, such as praise for one deliverable
+   * while a renewal is in doubt; shown for balance, does not lower confidence.
+   */
+  relation?: "contradicts" | "context";
 }
 
 export interface Signal {

@@ -79,7 +79,7 @@ export function homeFor(ws: Workspace): HomeModel {
       }
       if (fin?.cash) briefing.push(`Cash is forecast to bottom out at ${money(fin.cash.lowPoint.closing)} in the week of ${fmtDate(fin.cash.lowPoint.weekStart)}.`);
       if (fin && mode === "delivery") {
-        metrics.push({ label: "Operating result", value: money(fin.summary.operatingResult), scope, period: periodLabel, time: "historical", kind: "calculated", sub: "After all payroll and overhead", warnings: costWarning, href: "/finance", calcHref: "/calculations#operating-result", tone: fin.summary.operatingResult < 0 ? "bad" : undefined });
+        metrics.push({ label: "Operating result", value: money(fin.summary.operatingResult), scope, period: periodLabel, time: "historical", kind: "calculated", sub: "After all payroll and overhead", warnings: costWarning, href: "/finance", calcHref: "/calculations#operating", tone: fin.summary.operatingResult < 0 ? "bad" : undefined });
         metrics.push({ label: "Delivery margin", value: fmtPct(fin.summary.deliveryMargin), scope, period: periodLabel, time: "historical", kind: "calculated", sub: `Before overhead · target ${fmtPct(ws.org.defaultTargetMargin)}`, warnings: costWarning, href: "/finance", calcHref: "/calculations#delivery-margin", tone: fin.summary.deliveryMargin !== null && fin.summary.deliveryMargin < ws.org.defaultTargetMargin ? "warn" : undefined });
       }
       pushRevenueMetrics(ws, metrics, scope, periodLabel, asOf);
@@ -164,7 +164,7 @@ function pushRevenueMetrics(ws: Workspace, metrics: Metric[], scope: string, per
   if (ws.profile.modules.financeMode !== "subscription") return;
   const money = (n: number) => fmtMoney(n, ws.org.reportingCurrency, { compact: true });
   const arr = ws.data.subscriptions.filter((s) => s.renewalDate >= ws.org.demoDate).reduce((s, x) => s + x.mrr * 12, 0);
-  if (ws.caps.viewCommercialTerms) metrics.unshift({ label: "Annual recurring revenue", value: money(arr), scope, period: asOf, time: "current", kind: "calculated", sub: "Monthly recurring revenue × 12, active subscriptions", warnings: [], href: "/finance", calcHref: "/calculations#arr" });
+  if (ws.caps.viewCommercialTerms) metrics.unshift({ label: "Annual recurring revenue", value: money(arr), scope, period: asOf, time: "current", kind: "calculated", sub: "Monthly recurring revenue × 12, active subscriptions", warnings: [], href: "/finance", calcHref: "/calculations#earned" });
   if (ws.finance) metrics.push({ label: "Recognized revenue", value: money(ws.finance.summary.earnedRevenue), scope, period: periodLabel, time: "historical", kind: "calculated", warnings: [], href: "/finance" });
 }
 
