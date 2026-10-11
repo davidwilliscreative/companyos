@@ -8,6 +8,7 @@ import { fmtDate } from "@/lib/dates";
 import { DEMO_FX_TO_USD } from "@/lib/money";
 import { ROLES } from "@/lib/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { PUBLIC_DEMO } from "@/lib/supabase/config";
 
 const CAP_LABELS: [keyof (typeof ROLES)["executive"]["caps"], string][] = [
   ["allAccounts", "All accounts"],
@@ -38,7 +39,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings and demo controls" subtitle={member ? `Signed in as ${member.email} (${ROLES[member.role].label}). ${member.role === "executive" ? "As an executive you can preview other roles from the header." : ""}` : "Local demo. The role switcher simulates who is signed in; it is not authentication."} />
+      <PageHeader title="Settings and demo controls" subtitle={member ? `Signed in as ${member.email} (${ROLES[member.role].label}). ${member.role === "executive" ? "As an executive you can preview other roles from the header." : ""}` : PUBLIC_DEMO ? "Public preview. Anyone with the link can view and try the synthetic demo; changes go to a shared sandbox." : "Local demo. The role switcher simulates who is signed in; it is not authentication."} />
       {members && member && (
         <Card title="People with access" subtitle="Only these Google accounts can sign in. Their role decides what data is loaded for them.">
           <MembersManager members={members} me={member.email} />

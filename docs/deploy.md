@@ -75,3 +75,14 @@ role. Executives can preview the other roles from the header; everyone else sees
 - Edits are shared by everyone with access and stored as one row; **Reset demo data** (executives
   only) clears them for everyone.
 - Data is still synthetic and every connector is still simulated. This is a demo, not production.
+
+## Letting people view the demo without signing in
+
+1. In Vercel, open the companyos project → **Settings → Environment Variables**.
+2. Add `PUBLIC_DEMO` with the value `true` (Production), and save.
+3. Go to **Deployments**, open the menu (⋯) on the latest one, and choose **Redeploy**.
+
+Anyone with the link can now open the app and try it with the synthetic data. Their changes go to a
+separate sandbox, so they never touch what signed-in members see, and they can't add or remove
+people. To require sign-in again, delete the variable and redeploy. Turn this off before any real
+data is connected.

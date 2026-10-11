@@ -1,9 +1,11 @@
 import "server-only";
+import { PUBLIC_DEMO } from "@/lib/supabase/config";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { emptyState, type DemoState } from "./state";
 import { ConflictError, type RequestStore } from "./store";
 
-const ROW = "demo";
+/** Public-preview visitors get their own sandbox row so they never touch the members' state. */
+const ROW = PUBLIC_DEMO ? "public" : "demo";
 
 /**
  * Hosted backend: the overlay lives in one row of `app_state` (see supabase/migrations). Saves are
