@@ -109,7 +109,7 @@ export function Nav({ items, orgName, profileLabel, controls }: { items: NavItem
     <div className="flex items-center gap-2.5">
       <LogoMark className="shrink-0 rounded-lg shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]" />
       <div>
-        <div className="text-[14px] font-semibold leading-tight tracking-tight text-white">Opsight</div>
+        <div className="text-[14px] font-semibold leading-tight tracking-tight text-white">OpsInstinct</div>
         <div className="text-[11px] leading-tight text-sidebar-text/80">Demo · synthetic data</div>
       </div>
     </div>

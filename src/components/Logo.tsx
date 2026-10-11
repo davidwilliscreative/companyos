@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-/** Opsight mark: an open ring (the business at a glance) with a point of focus (what needs attention next). */
+/** OpsInstinct mark: an open ring (the business at a glance) with a point of focus (the thing your instinct says to look at next). */
 export function LogoMark({ size = 32, className }: { size?: number; className?: string }) {
   const id = useId();
   return (

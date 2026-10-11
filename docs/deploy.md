@@ -1,4 +1,4 @@
-# Putting Opsight online
+# Putting OpsInstinct online
 
 The hosted version runs on **Vercel** (the website), **Supabase** (sign-in and database) and
 **GitHub** (the code), the same setup as the personal finance app. It is still the synthetic-data demo

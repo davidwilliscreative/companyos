@@ -1,4 +1,4 @@
-# Opsight (phase-one demo)
+# OpsInstinct (phase-one demo)
 
 A company intelligence and operating platform for a CEO who is not in day-to-day execution. It answers "what needs my attention, why, and what should happen next?" across client health, delivery, profitability, cash, capacity, renewals and expansion, and lets the CEO drill into any account and ask questions about it.
 
@@ -6,7 +6,7 @@ A company intelligence and operating platform for a CEO who is not in day-to-day
 
 ## Setup
 
-**Not a developer?** Install Node.js (LTS) from https://nodejs.org, then double-click `Start Opsight (Mac).command` or `Start Opsight (Windows).bat`. The first run installs dependencies; your browser then opens the demo. Close the window to stop it.
+**Not a developer?** Install Node.js (LTS) from https://nodejs.org, then double-click `Start OpsInstinct (Mac).command` or `Start OpsInstinct (Windows).bat`. The first run installs dependencies; your browser then opens the demo. Close the window to stop it.
 
 Requirements: Node.js 20 or later. No API keys, accounts or external services.
 
@@ -37,7 +37,7 @@ The demo date is fixed at **Monday 5 October 2026**. The default reporting perio
 1. **Home (Agency, Executive).** A short briefing, four figures (each with its period, scope and any warning such as *Incomplete costs*) and the issues that need you. Related alerts are grouped into one issue with one owner and plan: Brightwater Credit Union's renewal (critical, executive decision), Verdant's approval delay, Harbor & Pine's loss-making forecast, and Priya Shah's overload, which absorbs the milestones it is blocking. *Since your last visit* lists what changed; the *Weekly report* tab replaces the old weekly briefing page (old links redirect).
 2. **Harbor & Pine (satisfied client, unprofitable project).** The client is happy, but the fixed-fee website rebuild is forecast at about −10% against a 45% target because of absorbed scope. Open *How this forecast is calculated*, then try the what-if calculator: a $185k change order lifts the forecast to about 11%. Nothing changes until you press **Apply to forecast**; removing it restores the original.
 3. **Brightwater (renewal risk).** The client page leads with status by dimension: the relationship is at risk while delivery and finances are fine. Open the signal to see supporting messages, contradicting evidence (separate from context from other conversations), the confidence explanation and the recommended plan. Confirm or dismiss it, or create a plan.
-4. **Ask Opsight** (⌘K / Ctrl+K). Try the suggested questions or variations such as "Why did Meridian's health decline?" or "Can we take on a new project with 200 developer hours?". Answers include figures, evidence links, the period and missing-data notes.
+4. **Ask OpsInstinct** (⌘K / Ctrl+K). Try the suggested questions or variations such as "Why did Meridian's health decline?" or "Can we take on a new project with 200 developer hours?". Answers include figures, evidence links, the period and missing-data notes.
 5. **Switch role to Account owner** (Sofia Alvarez). Only her four clients load and figures are labeled *Your accounts*; other clients' work appears on Capacity as "Other work"; Rates & costs shows bill rates but no cost rates; asking the assistant about someone's salary is refused; asking about Meridian (not hers) is reported as restricted without naming its details.
 6. **Switch role to Finance → Integrations → Google Sheets import.** Preview the compensation sheet to see validation errors (unknown person, invalid date, duplicate row), apply it, and preview again: every row is now *unchanged*. Omar Haddad's missing cost rate is filled in.
 7. **Switch profile** to SaaS startup (customers, ARR, seat usage, renewals) and Larger organization (business units, budgets, dependencies). Terminology, metrics, health components and modules change; billable utilization and client margins are not forced on them.

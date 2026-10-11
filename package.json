@@ -1,8 +1,8 @@
 {
-  "name": "opsight-demo",
+  "name": "opsinstinct-demo",
   "version": "0.1.0",
   "private": true,
-  "description": "Opsight — company intelligence and operating platform (phase-one demo, synthetic data only)",
+  "description": "OpsInstinct — company intelligence and operating platform (phase-one demo, synthetic data only)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

@@ -18,7 +18,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       <div className="w-full max-w-sm rounded-xl border border-line bg-white p-6 shadow-sm">
         <div className="flex items-center gap-2.5">
           <LogoMark size={28} />
-          <h1 className="text-lg font-semibold">Opsight</h1>
+          <h1 className="text-lg font-semibold">OpsInstinct</h1>
         </div>
         <p className="mt-1 text-sm text-ink-soft">Demo with synthetic data. Sign in with an approved Google account.</p>
         {sp.error && ERRORS[sp.error] && (

@@ -40,7 +40,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       />
       {flagged.length > 0 && (
         <Notice title="Instruction-like text detected">
-          {flagged.length} message{flagged.length === 1 ? " contains" : "s contain"} text that looks like instructions to an automated system. Opsight treats all message content as untrusted data: it is never executed or followed, and the assistant does not change behavior because of it.
+          {flagged.length} message{flagged.length === 1 ? " contains" : "s contain"} text that looks like instructions to an automated system. OpsInstinct treats all message content as untrusted data: it is never executed or followed, and the assistant does not change behavior because of it.
         </Notice>
       )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">

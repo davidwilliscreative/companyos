@@ -259,13 +259,13 @@ export function AssistantDrawer({ suggestions, broadScope }: { suggestions: stri
     <>
       <button ref={btnRef} className="btn btn-primary rounded-full pl-3 pr-2" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
         <Sparkles aria-hidden="true" size={15} className="text-[#a9a4ff]" />
-        Ask Opsight <kbd className="hidden rounded-md bg-white/15 px-1.5 py-0.5 font-sans text-[10px] font-medium text-white/80 sm:inline">⌘K</kbd>
+        Ask OpsInstinct <kbd className="hidden rounded-md bg-white/15 px-1.5 py-0.5 font-sans text-[10px] font-medium text-white/80 sm:inline">⌘K</kbd>
       </button>
       {open &&
         createPortal(
           <div className="fixed inset-0 z-50 flex justify-end">
             <button aria-label="Close assistant" tabIndex={-1} className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
-            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Opsight assistant" className="relative flex h-full w-full max-w-xl flex-col border-l border-line bg-canvas p-4 shadow-pop sm:p-5">
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="OpsInstinct assistant" className="relative flex h-full w-full max-w-xl flex-col border-l border-line bg-canvas p-4 shadow-pop sm:p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-base font-semibold tracking-tight">

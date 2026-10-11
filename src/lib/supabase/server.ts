@@ -29,7 +29,7 @@ let admin: SupabaseClient | null = null;
  */
 export function supabaseAdmin(): SupabaseClient {
   const secret = process.env.SUPABASE_SECRET_KEY;
-  if (!SUPABASE_URL || !secret) throw new Error("SUPABASE_SECRET_KEY is not set on the server, so Opsight can't reach its database.");
+  if (!SUPABASE_URL || !secret) throw new Error("SUPABASE_SECRET_KEY is not set on the server, so OpsInstinct can't reach its database.");
   if (!admin) admin = createClient(SUPABASE_URL, secret, { auth: { persistSession: false, autoRefreshToken: false } });
   return admin;
 }
