@@ -1,5 +1,5 @@
 /**
- * Core domain model for CompanyOS.
+ * Core domain model for Opsight.
  *
  * The model is deliberately industry-neutral: an agency "client project", a SaaS
  * "product initiative" and an enterprise "business-unit initiative" are all

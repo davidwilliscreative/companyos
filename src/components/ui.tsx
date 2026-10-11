@@ -87,7 +87,7 @@ export function Stat({ label, value, sub, kind, href, tone, size = "md" }: { lab
 
 const KIND_INFO = {
   observed: { label: "Observed", title: "Recorded fact from a source system (simulated)", cls: "bg-canvas text-ink-soft", dot: "bg-ink-faint" },
-  calculated: { label: "Calculated", title: "Computed by CompanyOS from recorded facts using documented formulas", cls: "bg-accent-soft text-accent", dot: "bg-accent" },
+  calculated: { label: "Calculated", title: "Computed by Opsight from recorded facts using documented formulas", cls: "bg-accent-soft text-accent", dot: "bg-accent" },
   inferred: { label: "Inferred", title: "Judgment derived from communication patterns; review before acting", cls: "bg-violet-soft text-violet", dot: "bg-violet" },
   estimate: { label: "Manual estimate", title: "Entered by a person; not committed revenue", cls: "bg-warn-soft text-warn", dot: "bg-warn" },
 } as const;

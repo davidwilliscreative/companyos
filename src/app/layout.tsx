@@ -4,7 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CompanyOS (demo)",
+  title: "Opsight (demo)",
   description: "Company intelligence and operating platform. Phase-one demo with synthetic data.",
 };
 

@@ -1,6 +1,6 @@
 # Permissions, issues and status
 
-How CompanyOS decides who sees what, how alerts become issues, and how status is judged. The code is the source of truth. This file explains it and must change when the code does:
+How Opsight decides who sees what, how alerts become issues, and how status is judged. The code is the source of truth. This file explains it and must change when the code does:
 
 - Capabilities: `src/lib/permissions.ts`
 - Enforcement: `src/data/access.ts`

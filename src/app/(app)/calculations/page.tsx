@@ -31,7 +31,7 @@ export default async function CalculationsPage() {
   ];
   return (
     <div className="space-y-6">
-      <PageHeader title="How numbers are calculated" subtitle="Every figure in CompanyOS is computed from recorded facts with these formulas. Each card in the product is tagged Observed, Calculated, Inferred or Manual estimate." />
+      <PageHeader title="How numbers are calculated" subtitle="Every figure in Opsight is computed from recorded facts with these formulas. Each card in the product is tagged Observed, Calculated, Inferred or Manual estimate." />
       <div className="grid gap-4 lg:grid-cols-2">
         {defs.map((d) => (
           <Card key={d.id} id={d.id} title={d.name}>

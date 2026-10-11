@@ -26,7 +26,7 @@ Permission changes (scope revoked, bot removed from a channel, mailbox removed f
 
 ## Mapping accounts and projects across systems
 
-Each connector proposes `EntityMapping` records that link an external name or id (a ClickUp folder, an accounting contact, a Slack channel, an email domain) to a CompanyOS account or project, with a confidence and a reason.
+Each connector proposes `EntityMapping` records that link an external name or id (a ClickUp folder, an accounting contact, a Slack channel, an email domain) to a Opsight account or project, with a confidence and a reason.
 
 - **High confidence** (exact id or unique domain match) can be auto-confirmed if the administrator allows it.
 - **Medium or low confidence** waits in the mapping review table on the Integrations page. An administrator confirms or rejects; until then the data is shown as an unconfirmed source and counts as a data gap in account health. The demo includes these cases (for example a ClickUp folder named "NW Cycles" that could also match an archived prospect).
@@ -58,7 +58,7 @@ Each connector declares what it is authoritative for (`authoritativeFor`). Defau
 | Bill rates, budgets, contracts | Google Sheets until a CRM or PSA exists |
 | Communications | Gmail and Slack |
 
-When two sources disagree, the authoritative value wins and the conflict is shown for review (the demo flags an invoice amount that differs between a spreadsheet and the accounting system). Manual edits in CompanyOS are kept as overrides with provenance, never silently overwritten.
+When two sources disagree, the authoritative value wins and the conflict is shown for review (the demo flags an invoice amount that differs between a spreadsheet and the accounting system). Manual edits in Opsight are kept as overrides with provenance, never silently overwritten.
 
 ## Retention and caching
 
@@ -69,7 +69,7 @@ When two sources disagree, the authoritative value wins and the conflict is show
 ## Google Sheets (read-only)
 
 1. The administrator selects a spreadsheet and sheet per dataset (compensation, bill rates, contracts, time entries, budgets, invoices, payments, expenses).
-2. CompanyOS suggests a column mapping from header names; the administrator adjusts it.
+2. Opsight suggests a column mapping from header names; the administrator adjusts it.
 3. A preview validates every row: required fields, types, dates, currencies, unknown people, projects or clients, duplicates within the sheet, and conflicts with authoritative systems.
 4. Applying writes only valid rows, keyed by stable ids (for example `person + effective date` for compensation and rates). Effective dates mean a raise applies from its date only.
 5. The compensation dataset is permissioned separately: only the Finance role can preview or import it, and its rows are never sent to the browser for other roles. Assistant retrieval sees compensation only for authorized roles.

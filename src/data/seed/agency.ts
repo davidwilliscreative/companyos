@@ -674,7 +674,7 @@ export function buildAgency(): Dataset {
     {
       id: "con_clickup", orgId: ORG, provider: "ClickUp", kind: "project_management", mode: "simulated", state: "healthy",
       lastSuccessfulSync: "2026-10-05T06:00:00Z", lastAttempt: "2026-10-05T06:00:00Z", recordsSynced: 0,
-      scopes: [{ scope: "Read spaces, folders, lists", granted: true }, { scope: "Read tasks & time tracking", granted: true }, { scope: "Write tasks", granted: false, note: "Not requested: CompanyOS is read-only" }],
+      scopes: [{ scope: "Read spaces, folders, lists", granted: true }, { scope: "Read tasks & time tracking", granted: true }, { scope: "Write tasks", granted: false, note: "Not requested: Opsight is read-only" }],
       included: ["Client Delivery space", "Internal Ops space"], excluded: [{ name: "People & HR space", reason: "Excluded by administrator" }],
       failures: [], authoritativeFor: ["Projects", "Milestones", "Tasks", "Time entries"],
     },

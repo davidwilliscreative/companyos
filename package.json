@@ -1,8 +1,8 @@
 {
-  "name": "companyos-demo",
+  "name": "opsight-demo",
   "version": "0.1.0",
   "private": true,
-  "description": "CompanyOS — company intelligence and operating platform (phase-one demo, synthetic data only)",
+  "description": "Opsight — company intelligence and operating platform (phase-one demo, synthetic data only)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
