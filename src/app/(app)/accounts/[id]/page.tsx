@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AssistantChat } from "@/components/Assistant";
+import { AskAssistantButton, AssistantScope } from "@/components/Assistant";
 import { UsageChart } from "@/components/Charts";
 import { SignalRow, peopleOptions } from "@/components/blocks";
 import { ActionForm } from "@/components/forms";
@@ -61,6 +61,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
             </span>
           </span>
         }
+        actions={<AskAssistantButton label={`Ask about this ${t.account.toLowerCase()}`} />}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:gap-4">
@@ -315,12 +316,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="space-y-6">
-          <Card title={`Ask about ${acc.name}`} subtitle="Account assistant: answers only from this account's records">
-            <div className="h-[460px]">
-              <AssistantChat accountId={acc.id} accountName={acc.name} suggestions={[`What is the current status of ${acc.name}?`, "What are the main risks right now?", "What is blocking delivery, and who owns the next step?", ws.profile.modules.invoices ? "Are there overdue invoices?" : "Is anything over budget?", ws.profile.modules.expansion ? "Is there an expansion opportunity?" : "What changed since last week?"]} />
-            </div>
-          </Card>
-
+          <AssistantScope kind="account" id={acc.id} label={`This ${ws.profile.terms.account.toLowerCase()}`} name={acc.name} suggestions={[`What is the current status of ${acc.name}?`, "What are the main risks right now?", "What is blocking delivery, and who owns the next step?", ws.profile.modules.invoices && ws.caps.viewCommercialTerms ? "Are there overdue invoices?" : "What changed since last week?"]} />
           <Card title="Actions" actions={<Link href={`/actions?account=${acc.id}`} className="text-xs">All →</Link>}>
             {actions.length === 0 ? (
               <p className="mb-3 text-sm text-ink-muted">No actions yet.</p>

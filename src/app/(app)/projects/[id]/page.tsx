@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { peopleOptions } from "@/components/blocks";
+import { AskAssistantButton, AssistantScope } from "@/components/Assistant";
 import { ActionForm } from "@/components/forms";
 import { ScenarioCalculator } from "@/components/ScenarioCalculator";
 import { Badge, Card, DefList, KindTag, MilestoneBadge, Notice, PageHeader, Restricted, SeverityBadge, SourceTag, Stat, CardLink } from "@/components/ui";
@@ -61,7 +62,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </span>
           </span>
         }
+        actions={<AskAssistantButton label={`Ask about this ${t.project.toLowerCase()}`} />}
       />
+      <AssistantScope kind="project" id={p.id} label={`This ${t.project.toLowerCase()}`} name={p.name} suggestions={[`What is the current status of ${p.name}?`, `What is blocking ${p.name}?`, ...(ws.caps.viewProjectCosts ? [`Why is ${p.name} forecast at this margin?`] : []), "Who is overloaded right now?"]} />
       <p className="max-w-3xl text-sm text-ink-soft">{p.description}</p>
 
       {f && (f.missing.length > 0 || f.notes.length > 0) && (

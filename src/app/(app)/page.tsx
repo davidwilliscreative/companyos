@@ -91,7 +91,7 @@ export default async function OverviewPage() {
           <>
             <Stat label="ARR (active subscriptions)" value={ws.data.subscriptions.length ? v.money(arr, { compact: true }) : "—"} sub="MRR × 12 at the demo date" kind="calculated" href="/finance" />
             {fin && <Stat label="Recognized revenue" value={v.money(fin.summary.earnedRevenue, { compact: true })} sub={a.period.label} kind="calculated" href="/finance" />}
-            <Stat label="Renewals in 120 days" value={renewals.length} sub={v.money(renewals.reduce((s, r) => s + r.annualValue, 0), { compact: true }) + " annual value"} kind="observed" href="#renewals" />
+            <Stat label="Renewals in 120 days" value={renewals.length} sub={v.money(renewals.reduce((s, r) => s + (r.annualValue ?? 0), 0), { compact: true }) + " annual value"} kind="observed" href="#renewals" />
           </>
         )}
         {mode === "budget" && (

@@ -44,7 +44,7 @@ export interface Analysis {
   receivables: ReturnType<typeof receivables>;
   capacity: CapacityOverview;
   attention: AttentionItem[];
-  renewals: { accountId: ID; contractId: ID; name: string; renewalDate: ISODate; noticeDate: ISODate | null; annualValue: number }[];
+  renewals: { accountId: ID; contractId: ID; name: string; renewalDate: ISODate; noticeDate: ISODate | null; /** null when the role may not see contract values. */ annualValue: number | null }[];
 }
 
 const SEV_W: Record<Severity, number> = { low: 1, medium: 2, high: 3, critical: 4 };

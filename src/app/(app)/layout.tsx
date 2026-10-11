@@ -6,7 +6,7 @@ import { canSwitchRole, getMember } from "@/data/member";
 import { getWorkspace } from "@/data/session";
 import { reportingPeriods } from "@/lib/calc/company";
 import { fmtDate } from "@/lib/dates";
-import { ROLES } from "@/lib/permissions";
+import { ROLES, aggregateScope } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Switchers {...switcherProps} show={["period"]} />
-                  <AssistantDrawer suggestions={suggestions} />
+                  <AssistantDrawer suggestions={suggestions} broadScope={aggregateScope(ws.caps)} />
                   {member && (
                     <a href="/auth/sign-out" title={`Signed in as ${member.email}. Sign out`} className="group inline-flex h-9 items-center gap-2 rounded-full bg-surface pl-1 pr-3 text-xs font-medium text-ink-soft no-underline ring-1 ring-inset ring-line hover:text-ink">
                       <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-full bg-ink text-[10px] font-semibold text-white">

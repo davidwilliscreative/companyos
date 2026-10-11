@@ -1,9 +1,16 @@
 import type { EvidenceLink, ID } from "@/domain/types";
 
+export type AssistantScopeKind = "account" | "project" | "my_accounts" | "company";
+
 export interface AssistantRequest {
   question: string;
-  /** Account-specific assistant: answers are restricted to this account. */
-  scope?: { accountId?: ID };
+  /**
+   * Scope of the conversation. With an accountId or projectId the answer,
+   * caveats, evidence and suggested follow-ups stay inside that record.
+   * Without one, the scope is everything the role may read: "my_accounts" for
+   * account owners, "company" for all-account roles.
+   */
+  scope?: { accountId?: ID; projectId?: ID };
 }
 
 export interface AssistantFigure {
@@ -21,6 +28,8 @@ export interface AssistantEvidence extends EvidenceLink {
 export interface AssistantResponse {
   provider: { id: string; label: string; simulated: boolean };
   intent: string;
+  /** What the answer covers, shown with every answer. */
+  scope: { kind: AssistantScopeKind; label: string; name?: string };
   /** Direct answer first, then supporting sentences. Plain text, one paragraph per array item. */
   answer: string[];
   figures: AssistantFigure[];
