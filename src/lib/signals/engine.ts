@@ -134,6 +134,8 @@ const BASE_SEVERITY: Record<SignalCategory, Severity> = {
   positive_feedback: "low",
 };
 
+const polarityOf = (c: SignalCategory) => (c === "expansion_interest" ? "opportunity" : c === "positive_feedback" ? "positive" : "risk");
+
 const COUNTER: Partial<Record<SignalCategory, SignalCategory[]>> = {
   dissatisfaction: ["positive_feedback"],
   unresolved_issue: ["positive_feedback"],
@@ -238,8 +240,12 @@ export function detectSignals(ds: Dataset, opts: EngineOptions): Omit<Signal, "r
 
       // Counter-evidence: opposite-polarity messages from the same account.
       const counterCats = COUNTER[category] ?? [];
-      const counter = active.filter((h) => h.thread.accountId === accountId && counterCats.includes(h.category));
-      const newerCounter = counter.filter((h) => h.message.sentAt > last.message.sentAt);
+      const counter = active.filter((h, i, all) => h.thread.accountId === accountId && counterCats.includes(h.category) && all.findIndex((x) => x.message.id === h.message.id && counterCats.includes(x.category)) === i);
+      const evidenceThreads = new Set(ev.map((h) => h.thread.id));
+      const OPPOSITE: Partial<Record<SignalCategory, SignalCategory[]>> = { renewal_risk: ["expansion_interest"], expansion_interest: ["renewal_risk"] };
+      const contradicts = (h: Hit) => evidenceThreads.has(h.thread.id) || (OPPOSITE[category] ?? []).includes(h.category);
+      const newerCounter = counter.filter((h) => h.message.sentAt > last.message.sentAt && contradicts(h));
+      const contextCount = counter.filter((h) => !contradicts(h)).length;
 
       // Detection date: when cumulative (undecayed) evidence first crossed the threshold.
       let cum = 0;
@@ -265,8 +271,9 @@ export function detectSignals(ds: Dataset, opts: EngineOptions): Omit<Signal, "r
       if (newerCounter.length && !autoResolved) {
         confidence = confidence === "high" ? "medium" : "low";
         reasons.push(`lowered because ${newerCounter.length} newer message${newerCounter.length === 1 ? "" : "s"} point the other way`);
-      } else if (counter.length) reasons.push(`${counter.length} contradicting message${counter.length === 1 ? "" : "s"} noted`);
+      } else if (counter.length - contextCount > 0) reasons.push(`${counter.length - contextCount} older contradicting message${counter.length - contextCount === 1 ? "" : "s"} noted`);
       else reasons.push("no contradicting messages");
+      if (contextCount) reasons.push(`${contextCount} ${polarityOf(category) === "positive" ? "critical" : "positive"} remark${contextCount === 1 ? "" : "s"} in other conversations kept as context, not counted against it`);
 
       // Severity
       let severity = BASE_SEVERITY[category];
@@ -320,7 +327,7 @@ export function detectSignals(ds: Dataset, opts: EngineOptions): Omit<Signal, "r
         summary: autoResolved ? `Resolved: ${summaryByCat[category].replace(/^(\S)/, (c) => c)}` : summaryByCat[category],
         explanation: explanationParts.join(" "),
         evidence: evidenceHits.map(toEvidence).reverse(),
-        counterEvidence: counter.map(toEvidence).reverse(),
+        counterEvidence: counter.map((h) => ({ ...toEvidence(h), relation: contradicts(h) ? ("contradicts" as const) : ("context" as const) })).reverse(),
         resolutionEvidence: (resolutions.get(`${accountId}|${category}`) ?? []).map(toEvidence),
         autoResolved,
         recommendedAction: autoResolved ? "No action needed. Keep monitoring; reference the resolution if the topic returns." : ACTION_TEMPLATES[category],

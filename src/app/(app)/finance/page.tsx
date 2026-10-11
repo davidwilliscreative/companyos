@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BillingChart, CashChart, RevenueChart } from "@/components/Charts";
+import { MetricCard } from "@/components/issues";
 import { Card, KindTag, Notice, PageHeader, Restricted, Stat } from "@/components/ui";
+import type { Metric } from "@/lib/home";
 import { getWorkspace } from "@/data/session";
 import { AGING_BUCKETS, DEFAULT_CASH_ASSUMPTIONS, type CashAssumptions } from "@/lib/calc/company";
 import { fmtDate } from "@/lib/dates";
@@ -128,15 +130,54 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
         </Notice>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:gap-4">
-        {mode === "subscription" && <Stat label="ARR" value={v.money(arr, { compact: true })} sub="Active subscriptions × 12" kind="calculated" />}
-        <Stat label={mode === "subscription" ? "Recognized revenue" : "Earned revenue"} value={v.money(s.earnedRevenue, { compact: true })} sub={mode === "subscription" ? "Subscription months in period" : "Work performed in period"} kind="calculated" />
-        {mode === "delivery" && <Stat label="Delivery margin" value={fmtPct(s.deliveryMargin)} sub={`${v.money(s.deliveryProfit, { compact: true })} delivery profit`} kind="calculated" href="#reconciliation" />}
-        <Stat label="Invoiced" value={v.money(s.invoiced, { compact: true })} sub="Invoices issued in period" kind="observed" />
-        <Stat label="Collected" value={v.money(s.collected, { compact: true })} sub="Payments received in period" kind="observed" />
-        <Stat label="Outstanding receivables" value={v.money(a.receivables.totalOutstanding, { compact: true })} sub={`${v.money(a.receivables.totalOverdue, { compact: true })} overdue`} kind="observed" href="#receivables" tone={a.receivables.totalOverdue > 0 ? "warn" : undefined} />
-        {company && <Stat label="Operating result" value={v.money(s.operatingResult, { compact: true })} sub="After payroll, contractors, expenses and overhead" kind="calculated" href="#reconciliation" tone={s.operatingResult < 0 ? "bad" : undefined} />}
-      </div>
+      {(() => {
+        const scope = company ? "Company-wide" : "Your accounts";
+        const period = `${a.period.label.replace(/ \(.*\)$/, "")} · ${fmtDate(a.period.start, { year: false })} – ${fmtDate(a.period.end)}`;
+        const asOf = `As of ${fmtDate(ws.org.demoDate)}`;
+        const costWarn = s.missing.length ? [{ label: "Incomplete costs", detail: s.missing.join(" ") }] : [];
+        const arWarn = ws.sources.filter((x) => x.affects.some((y) => /receivable/i.test(y))).map((x) => ({ label: "Source out of date", detail: x.summary }));
+        const results: Metric[] = [
+          ...(mode === "subscription" ? [{ label: "Annual recurring revenue", value: v.money(arr, { compact: true }), scope, period: asOf, time: "current" as const, kind: "calculated" as const, sub: "Active subscriptions × 12", warnings: [], calcHref: "/calculations#earned" }] : []),
+          { label: mode === "subscription" ? "Recognized revenue" : "Earned revenue", value: v.money(s.earnedRevenue, { compact: true }), scope, period, time: "historical", kind: "calculated", sub: mode === "subscription" ? "Subscription months in the period" : "Value of work performed, whether or not invoiced", warnings: [], calcHref: "/calculations#earned" },
+          ...(mode === "delivery" ? [{ label: "Delivery margin", value: fmtPct(s.deliveryMargin), scope, period, time: "historical" as const, kind: "calculated" as const, sub: `Before overhead · target ${fmtPct(ws.org.defaultTargetMargin)} · ${v.money(s.deliveryProfit, { compact: true })} delivery profit`, warnings: costWarn, calcHref: "#reconciliation", tone: s.deliveryMargin !== null && s.deliveryMargin < ws.org.defaultTargetMargin ? ("warn" as const) : undefined }] : []),
+          ...(company ? [{ label: "Operating result", value: v.money(s.operatingResult, { compact: true }), scope, period, time: "historical" as const, kind: "calculated" as const, sub: "After all payroll, internal costs and overhead", warnings: costWarn, calcHref: "#reconciliation", tone: s.operatingResult < 0 ? ("bad" as const) : undefined }] : []),
+        ];
+        const billing: Metric[] = [
+          { label: "Invoiced", value: v.money(s.invoiced, { compact: true }), scope, period, time: "historical", kind: "observed", sub: "Invoices issued in the period", warnings: arWarn },
+          { label: "Collected", value: v.money(s.collected, { compact: true }), scope, period, time: "historical", kind: "observed", sub: "Payments received in the period", warnings: arWarn },
+          { label: "Outstanding receivables", value: v.money(a.receivables.totalOutstanding, { compact: true }), scope, period: asOf, time: "current", kind: "observed", sub: `${v.money(a.receivables.totalOverdue, { compact: true })} overdue`, warnings: arWarn, href: "#receivables", tone: a.receivables.totalOverdue > 0 ? "warn" : undefined },
+          ...(fin.cash ? [{ label: "Cash low point", value: v.money(fin.cash.lowPoint.closing, { compact: true }), scope, period: `Next ${fin.cash.weeks.length} weeks · week of ${fmtDate(fin.cash.lowPoint.weekStart, { year: false })}`, time: "forecast" as const, kind: "calculated" as const, sub: "Base case; change the assumptions below", warnings: arWarn, href: "#cash", tone: fin.cash.lowPoint.closing < 0 ? ("bad" as const) : undefined }] : []),
+        ];
+        return (
+          <>
+            <section aria-labelledby="results-title" className="space-y-3">
+              <h2 id="results-title" className="text-lg font-semibold tracking-tight">
+                Results for {a.period.label}
+              </h2>
+              <div className={`grid grid-cols-2 gap-2.5 sm:gap-3 ${results.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
+                {results.map((m) => (
+                  <MetricCard key={m.label} m={m} />
+                ))}
+              </div>
+              {company && mode === "delivery" && (
+                <p className="max-w-3xl text-sm text-ink-soft">
+                  <strong className="font-medium text-ink">Why a {fmtPct(s.deliveryMargin)} margin leaves {v.money(s.operatingResult, { compact: true })}:</strong> delivery margin only counts the direct cost of client work. Payroll for time not spent on clients ({v.money(s.nonClientLabor, { compact: true })}), internal work ({v.money(s.internalContractorAndExpenses, { compact: true })}) and overhead ({v.money(s.overhead, { compact: true })}) come out afterwards. <Link href="#reconciliation">View calculation</Link>
+                </p>
+              )}
+            </section>
+            <section aria-labelledby="cashflow-title" className="space-y-3">
+              <h2 id="cashflow-title" className="text-lg font-semibold tracking-tight">
+                Billing and cash
+              </h2>
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+                {billing.map((m) => (
+                  <MetricCard key={m.label} m={m} />
+                ))}
+              </div>
+            </section>
+          </>
+        );
+      })()}
 
       {company && fin.monthly.length > 0 && (
         <div className="grid gap-6 xl:grid-cols-2">
@@ -150,7 +191,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
       )}
 
       {company && (
-        <Card id="reconciliation" title="Reconciliation: delivery margin to operating result" subtitle="Employee salaries are counted once. Labor recorded on client work is part of delivery cost; the remainder of payroll is shown separately." actions={<KindTag kind="calculated" />}>
+        <Card id="reconciliation" title="Calculation: from delivery margin to operating result" subtitle="Employee salaries are counted once. Labor recorded on client work is part of delivery cost; the remainder of payroll is shown separately." actions={<KindTag kind="calculated" />}>
           <table className="w-full max-w-2xl">
             <tbody>
               {mode === "delivery" ? (
@@ -182,10 +223,32 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
         </Card>
       )}
 
+      {mode === "delivery" && (() => {
+        const rows = ws.data.projects.flatMap((p) => (a.projectFin[p.id]?.unbilled.items ?? []).map((u) => ({ p, u })));
+        if (!rows.length) return null;
+        return (
+          <Card id="unbilled" title="Unbilled work" subtitle={`Delivered but not invoiced or not yet priced, as of ${fmtDate(ws.org.demoDate)}. Valued at bill rates; not revenue until agreed.`} actions={<KindTag kind="calculated" />}>
+            <ul className="divide-y divide-line text-sm">
+              {rows.map(({ p, u }, n) => (
+                <li key={n} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+                  <span>
+                    <Link href={`/projects/${p.id}?tab=financials`}>{p.name}</Link>
+                    <span className="block text-xs text-ink-muted">{u.label}</span>
+                  </span>
+                  <span className="tabular-nums">
+                    {v.money(u.value, { compact: true })} <span className="text-xs text-ink-muted">· {fmtHours(u.hours)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        );
+      })()}
+
       <Card id="receivables" title="Accounts receivable aging" subtitle={`As of ${fmtDate(ws.org.demoDate, { year: true })}`} padded={false}>
-        <div className="grid grid-cols-5 border-b border-line">
+        <div className="grid grid-cols-2 border-b border-line sm:grid-cols-5">
           {AGING_BUCKETS.map((b) => (
-            <div key={b} className="border-r border-line p-3 last:border-r-0">
+            <div key={b} className="border-b border-r border-line p-3 last:border-r-0 sm:border-b-0">
               <div className="text-xs text-ink-muted">{b === "current" ? "Not yet due" : `${b} days`}</div>
               <div className={`text-lg font-semibold tabular-nums ${b === "61-90" || b === "90+" ? (a.receivables.buckets[b] > 0 ? "text-bad" : "") : b !== "current" && a.receivables.buckets[b] > 0 ? "text-warn" : ""}`}>{v.money(a.receivables.buckets[b], { compact: true })}</div>
             </div>
@@ -334,7 +397,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
           </div>
           <ul className="space-y-1.5">
             {fin.concentration.rows.map((r) => (
-              <li key={r.accountId} className="grid grid-cols-[160px_1fr_90px_50px] items-center gap-3 text-sm">
+              <li key={r.accountId} className="grid grid-cols-[minmax(0,120px)_1fr_64px] items-center gap-3 text-sm sm:grid-cols-[160px_1fr_90px_50px]">
                 <Link href={`/accounts/${r.accountId}`} className="truncate">
                   {v.account(r.accountId)}
                 </Link>
@@ -342,7 +405,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
                   <div className="h-2 rounded-full bg-accent" style={{ width: `${Math.round(r.share * 100)}%` }} />
                 </div>
                 <span className="text-right tabular-nums">{v.money(r.revenue, { compact: true })}</span>
-                <span className="text-right text-xs tabular-nums text-ink-muted">{fmtPct(r.share)}</span>
+                <span className="hidden text-right text-xs tabular-nums text-ink-muted sm:inline">{fmtPct(r.share)}</span>
               </li>
             ))}
           </ul>

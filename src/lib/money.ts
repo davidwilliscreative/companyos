@@ -47,3 +47,13 @@ export function fmtHours(h: number | null | undefined): string {
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/**
+ * Difference between two percentages, in percentage points. Takes fractions:
+ * fmtPts(-0.101 - 0.45) === "−55.1 pts". Never "%", which would read as a relative change.
+ */
+export function fmtPts(diff: number | null | undefined, digits = 1): string {
+  if (diff === null || diff === undefined || !Number.isFinite(diff)) return "—";
+  const s = `${(Math.abs(diff) * 100).toFixed(digits)} pts`;
+  return diff < 0 ? `−${s}` : diff > 0 ? `+${s}` : s;
+}

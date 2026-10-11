@@ -57,6 +57,7 @@ interface Ctx {
   req: AssistantRequest;
   ents: ResolvedEntities;
   scopeAccount?: Account;
+  scopeProject?: Project;
 }
 
 const PROVIDER = { id: "simulated", label: "Simulated assistant (no AI service connected)", simulated: true };
@@ -77,6 +78,7 @@ function response(intent: string, ws: Workspace, parts: Partial<AssistantRespons
   return {
     provider: PROVIDER,
     intent,
+    scope: parts.scope ?? { kind: ws.caps.allAccounts ? "company" : "my_accounts", label: ws.caps.allAccounts ? "Company-wide" : "My accounts" },
     answer: parts.answer ?? [],
     figures: parts.figures ?? [],
     evidence,
@@ -178,9 +180,11 @@ function parseNewWork(ws: Workspace, q: string) {
 }
 
 function capacity(c: Ctx): AssistantResponse {
-  const { ws, req } = c;
+  const { ws, req, scopeAccount } = c;
   const q = req.question;
-  const overloaded = ws.analysis.capacity.overallocated;
+  const scopeProjects = scopeAccount ? new Set(ws.data.projects.filter((p) => p.accountId === scopeAccount.id).map((p) => p.id)) : null;
+  // In a client or project scope, only people working on that client's projects are relevant.
+  const overloaded = ws.analysis.capacity.overallocated.filter((pc) => !scopeProjects || pc.projects.some((x) => scopeProjects.has(x.projectId)));
   const asksAccept = /accept|take on|new project|new client|room for/i.test(q);
   const ev: AssistantEvidence[] = overloaded.map((pc) => ({ type: "person" as const, id: pc.person.id, label: `${pc.person.name}: up to ${fmtPct(pc.upcoming.peakPct)} planned`, href: hrefFor({ type: "person", id: pc.person.id }) }));
   const notes: string[] = [];
@@ -193,7 +197,8 @@ function capacity(c: Ctx): AssistantResponse {
       : ["Nobody is planned above capacity in the next four weeks."];
     const util = ws.analysis.capacity.team.utilization;
     if (ws.profile.modules.billableUtilization && util !== null) answer.push(`Billable utilization for delivery staff was ${fmtPct(util)} in ${ws.analysis.period.label}, against a ${fmtPct(ws.org.billableUtilizationTarget ?? null)} target.`);
-    const blocked = ws.data.tasks.filter((t) => t.status === "blocked" && overloaded.some((o) => o.person.id === t.assigneeId));
+    const blocked = ws.data.tasks.filter((t) => t.status === "blocked" && overloaded.some((o) => o.person.id === t.assigneeId) && (!scopeProjects || scopeProjects.has(t.projectId)));
+    if (scopeAccount && overloaded.length) notes.push(`Load counts all of their assigned work, including work for other ${ws.profile.terms.accounts.toLowerCase()}.`);
     if (blocked.length) answer.push(`${blocked.length} task${blocked.length === 1 ? " is" : "s are"} blocked waiting on them: ${blocked.map((t) => t.title).join(", ")}.`);
     return response("capacity", ws, {
       answer,
@@ -225,7 +230,7 @@ function capacity(c: Ctx): AssistantResponse {
     evidence: [...ev, { type: "calculation", id: "capacity", label: "Team capacity view", href: "/team#capacity" }],
     period: `${reqd.weeks} weeks from ${fmtDate(reqd.startDate)}`,
     notes,
-    followUps: ["Who is overloaded right now?", "What is blocking the Copperline beta?"],
+    followUps: ["Who is overloaded right now?", ...blockerFollowUp(ws, c.scopeAccount)],
   });
 }
 
@@ -309,7 +314,7 @@ function blocker(c: Ctx): AssistantResponse {
 
 function margin(c: Ctx): AssistantResponse {
   const { ws, ents, scopeAccount } = c;
-  if (!ws.caps.viewProjectCosts) return noAccess(ws, "Project costs and margins are not available to the administrator role.");
+  if (!ws.caps.viewProjectCosts) return noAccess(ws, "Project costs and margins are not available to your role.");
   const fin = ws.analysis.projectFin;
   const projects = ws.data.projects.filter((p) => fin[p.id]);
   if (!ws.profile.modules.projectMargins) {
@@ -389,11 +394,12 @@ function expansion(c: Ctx): AssistantResponse {
 function cash(c: Ctx): AssistantResponse {
   const { ws, scopeAccount, ents } = c;
   if (!ws.profile.modules.invoices) return response("cash", ws, { answer: [`Invoices and cash forecasting aren't part of the ${ws.profile.label} profile.`], insufficient: true });
-  if (!ws.caps.viewCompanyFinance && !ws.caps.viewProjectCosts) return noAccess(ws, "Invoices and cash are restricted to Finance, Executive and account owners (for their own accounts).");
+  if (!ws.caps.viewCommercialTerms) return noAccess(ws, "Invoice amounts and cash are restricted to Finance, Executive and account owners (for their own accounts).");
   let overdue = ws.analysis.receivables.overdue;
   const filterAcct = scopeAccount ? [scopeAccount.id] : ents.accounts.map((a) => a.id);
   if (filterAcct.length) overdue = overdue.filter((s) => filterAcct.includes(s.invoice.accountId));
-  const cf = ws.finance?.cash ?? null;
+  // A client-scoped answer stays on that client's invoices; the company cash outlook is a different scope.
+  const cf = scopeAccount ? null : ws.finance?.cash ?? null;
   const excludedIds = new Set(cf?.excluded.map((e) => e.invoiceId) ?? []);
   const ranked = [...overdue].sort((a, b) => b.outstanding * (1 + b.daysOverdue / 30) - a.outstanding * (1 + a.daysOverdue / 30));
   const total = overdue.reduce((s, x) => s + x.outstanding, 0);
@@ -406,7 +412,7 @@ function cash(c: Ctx): AssistantResponse {
   if (cf) {
     const excludedTotal = cf.excluded.reduce((s, e) => s + e.amount, 0);
     answer.push(`Cash outlook: opening ${money(ws, cf.opening.amount)}; the 13-week base case bottoms out at ${money(ws, cf.lowPoint.closing)} in the week of ${fmtDate(cf.lowPoint.weekStart)}.${excludedTotal > 0 ? ` Collecting the excluded ${money(ws, excludedTotal)} would raise that low point to ${money(ws, cf.lowPoint.closing + excludedTotal)}.` : ""}`);
-  } else answer.push("Company cash forecasting is only available to Finance and Executive roles.");
+  } else if (!scopeAccount) answer.push("Company cash forecasting is only available to Finance and Executive roles.");
   return response("cash", ws, {
     answer,
     figures: [
@@ -414,7 +420,7 @@ function cash(c: Ctx): AssistantResponse {
       ...(cf ? [{ label: "13-week low point", value: money(ws, cf.lowPoint.closing), kind: "calculated" as const }, { label: "Opening cash (bank balance)", value: money(ws, cf.opening.amount), kind: "observed" as const }] : []),
     ],
     evidence: [...ranked.slice(0, 5).map((s) => ({ type: "invoice" as const, id: s.invoice.id, label: `${s.invoice.number} (${accountName(ws, s.invoice.accountId)})`, href: hrefFor({ type: "invoice", id: s.invoice.id }) })), ...(cf ? [{ type: "calculation" as const, id: "cash:forecast", label: "Cash forecast and assumptions", href: hrefFor({ type: "calculation", id: "cash:forecast" }) }] : [])],
-    notes: [...(cf?.notes ?? []), ...ws.data.connectors.filter((x) => x.kind === "finance" && (x.state === "stale" || x.failures.length)).map((x) => `${x.provider}: ${x.failures[0]?.message ?? `state ${x.state}`}`)],
+    notes: [...(cf?.notes ?? []), ...ws.sources.filter((x) => x.affects.some((a) => /receivable|cash/i.test(a))).map((x) => x.summary)],
   });
 }
 
@@ -427,12 +433,12 @@ function renewals(c: Ctx): AssistantResponse {
   for (const r of list) {
     const risk = ws.analysis.signals.find((s) => s.accountId === r.accountId && s.category === "renewal_risk" && !s.autoResolved && s.review.status !== "dismissed");
     const h = ws.analysis.health[r.accountId];
-    answer.push(`${accountName(ws, r.accountId)}, ${r.name}: renews ${fmtDate(r.renewalDate)}${r.noticeDate ? ` (notice by ${fmtDate(r.noticeDate)})` : ""}, ${money(ws, r.annualValue)} a year. Health ${h?.score ?? "n/a"}${risk ? `; renewal risk ${risk.severity}, ${risk.confidence} confidence: ${risk.evidence.length} supporting messages` : ""}.`);
+    answer.push(`${accountName(ws, r.accountId)}, ${r.name}: renews ${fmtDate(r.renewalDate)}${r.noticeDate ? ` (notice by ${fmtDate(r.noticeDate)})` : ""}${r.annualValue !== null ? `, ${money(ws, r.annualValue)} a year` : ""}. Health ${h?.score ?? "n/a"}${risk ? `; renewal risk ${risk.severity}, ${risk.confidence} confidence: ${risk.evidence.length} supporting messages` : ""}.`);
     if (risk) evidence.push(evSignal(risk), ...risk.evidence.slice(0, 3).map((e) => evMessage(ws, e)));
     const a = ws.data.accounts.find((x) => x.id === r.accountId);
     if (a) evidence.push(evAccount(ws, a));
   }
-  return response("renewals", ws, { answer, evidence, figures: list.map((r) => ({ label: `${accountName(ws, r.accountId)} annual value`, value: money(ws, r.annualValue), kind: "observed" as const })), notes: ["Renewal risk is inferred from conversation evidence; it is not a statistically validated churn probability."] });
+  return response("renewals", ws, { answer, evidence, figures: list.filter((r) => r.annualValue !== null).map((r) => ({ label: `${accountName(ws, r.accountId)} annual contract value`, value: money(ws, r.annualValue), kind: "observed" as const })), notes: ["Renewal risk is inferred from conversation evidence; it is not a statistically validated churn probability."] });
 }
 
 function health(c: Ctx): AssistantResponse {
@@ -479,7 +485,7 @@ function attention(c: Ctx): AssistantResponse {
   const projectFocus = /project|initiative|delivery/i.test(req.question) && !/account|client|customer/i.test(req.question);
   if (projectFocus) items = items.filter((i) => i.projectId);
   const accountFocus = /account|client|customer|business unit/i.test(req.question) && !scopeAccount;
-  if (!items.length) return response("attention", ws, { answer: ["Nothing currently needs executive attention in your scope."] });
+  if (!items.length) return response("attention", ws, { answer: [scopeAccount ? `Nothing currently needs attention for ${scopeAccount.name}.` : "Nothing currently needs attention in your scope."] });
   const answer: string[] = [];
   const evidence: AssistantEvidence[] = [];
   if (accountFocus) {
@@ -502,7 +508,18 @@ function attention(c: Ctx): AssistantResponse {
       for (const l of i.links.slice(0, 2)) evidence.push({ ...l, label: i.title, href: hrefFor(l, ws.data) });
     }
   }
-  const insufficient = ws.data.accounts.filter((a) => ws.analysis.health[a.id]?.status === "insufficient");
+  // Caveats and suggestions stay inside the scope of the question.
+  const insufficient = ws.data.accounts.filter((a) => ws.analysis.health[a.id]?.status === "insufficient" && (!scopeAccount || a.id === scopeAccount.id));
+  const declining = ws.data.accounts
+    .filter((a) => !scopeAccount || a.id === scopeAccount.id)
+    .map((a) => ({ a, d: (ws.analysis.health[a.id]?.score ?? 0) - (ws.analysis.healthPrev[a.id] ?? ws.analysis.health[a.id]?.score ?? 0) }))
+    .filter((x) => x.d < 0)
+    .sort((x, y) => x.d - y.d)[0]?.a;
+  const followUps = [
+    ...(declining ? [`Why did ${declining.name}'s health decline?`] : []),
+    ...(ws.caps.viewCommercialTerms && ws.profile.modules.invoices && ws.analysis.receivables.overdue.some((r) => !scopeAccount || r.invoice.accountId === scopeAccount.id) ? [scopeAccount ? "Are there overdue invoices?" : "Which overdue invoices most affect our cash outlook?"] : []),
+    ...blockerFollowUp(ws, scopeAccount),
+  ].slice(0, 3);
   return response("attention", ws, {
     answer,
     figures: [{ label: "Open attention items", value: String(items.length), kind: "calculated" }, { label: "Critical or high", value: String(items.filter((i) => i.severity === "critical" || i.severity === "high").length), kind: "calculated" }],
@@ -512,7 +529,7 @@ function attention(c: Ctx): AssistantResponse {
       ...insufficient.map((a) => `${a.name} has insufficient current data; absence of problems there is not evidence of health.`),
       "Priority combines severity, financial impact and due date. Suggested due dates and next steps are generated by CompanyOS rules.",
     ],
-    followUps: ["Why did Meridian's health decline?", "Which overdue invoices most affect our cash outlook?"],
+    followUps,
   });
 }
 
@@ -579,27 +596,130 @@ function summary(c: Ctx, account: Account): AssistantResponse {
   });
 }
 
+
+/** A follow-up about the most blocked work, only when it exists inside the scope. */
+function blockerFollowUp(ws: Workspace, scopeAccount?: Account): string[] {
+  const p = ws.data.projects.find((x) => x.status !== "completed" && (!scopeAccount || x.accountId === scopeAccount.id) && ws.data.milestones.some((m) => m.projectId === x.id && ["blocked", "awaiting_client"].includes(ws.analysis.milestones[m.id]?.state ?? "")));
+  return p ? [`What is blocking ${p.name}?`] : [];
+}
+
+function projectSummary(c: Ctx, p: Project): AssistantResponse {
+  const { ws } = c;
+  const f = ws.analysis.projectFin[p.id];
+  const ms = ws.data.milestones.filter((m) => m.projectId === p.id && ws.analysis.milestones[m.id]?.state !== "done").sort((a, b) => (ws.analysis.milestones[a.id].due < ws.analysis.milestones[b.id].due ? -1 : 1));
+  const worst = ms.find((m) => ["late", "blocked", "awaiting_client"].includes(ws.analysis.milestones[m.id].state));
+  const blocked = ws.data.tasks.filter((t) => t.projectId === p.id && t.status === "blocked");
+  const answer = [`${p.name} is ${p.status.replace("_", " ")}, owned by ${personName(ws, p.ownerId)}, due to finish ${fmtDate(p.currentEndDate)}${p.currentEndDate !== p.originalEndDate ? ` (originally ${fmtDate(p.originalEndDate)})` : ""}.`];
+  if (worst) answer.push(`"${worst.name}" is ${ws.analysis.milestones[worst.id].state.replace("_", " ")}${worst.blockedReason ? `: ${worst.blockedReason}` : ""}. ${personName(ws, worst.ownerId)} owns the next step.`);
+  else if (ms[0]) answer.push(`Next milestone: "${ms[0].name}" due ${fmtDate(ws.analysis.milestones[ms[0].id].due)}.`);
+  if (blocked.length) answer.push(`${blocked.length} blocked task${blocked.length === 1 ? "" : "s"}: ${blocked.map((t) => `${t.title} (${personName(ws, t.assigneeId)})`).join("; ")}.`);
+  if (f && f.margin.forecastAtCompletion !== null) answer.push(`Forecast delivery margin at completion is ${fmtPct(f.margin.forecastAtCompletion)} against a ${fmtPct(f.margin.target)} target.`);
+  return response("summary", ws, {
+    answer,
+    figures: f && f.margin.forecastAtCompletion !== null ? [{ label: "Forecast margin", value: fmtPct(f.margin.forecastAtCompletion), kind: "calculated" }] : [],
+    evidence: [evProject(p), ...(worst ? [{ type: "milestone" as const, id: worst.id, label: worst.name, href: hrefFor({ type: "milestone", id: worst.id }, ws.data) }] : []), ...blocked.map((t) => ({ type: "task" as const, id: t.id, label: t.title, href: hrefFor({ type: "task", id: t.id }, ws.data) }))],
+    notes: f?.missing.slice(0, 3) ?? [],
+    followUps: [...(f ? [`Why is ${p.name} forecast at this margin?`] : []), `What is blocking ${p.name}?`],
+  });
+}
+
+/** Which account a piece of evidence belongs to, when it belongs to one. */
+function evidenceAccount(ws: Workspace, e: AssistantEvidence): ID | null | undefined {
+  switch (e.type) {
+    case "account":
+      return e.id;
+    case "project":
+      return ws.data.projects.find((p) => p.id === e.id)?.accountId ?? null;
+    case "milestone": {
+      const m = ws.data.milestones.find((x) => x.id === e.id);
+      return m ? ws.data.projects.find((p) => p.id === m.projectId)?.accountId ?? null : null;
+    }
+    case "task": {
+      const t = ws.data.tasks.find((x) => x.id === e.id);
+      return t ? ws.data.projects.find((p) => p.id === t.projectId)?.accountId ?? null : null;
+    }
+    case "invoice":
+      return ws.data.invoices.find((i) => i.id === e.id)?.accountId ?? null;
+    case "signal":
+      return ws.analysis.signals.find((s) => s.id === e.id)?.accountId ?? null;
+    case "opportunity":
+      return ws.analysis.opportunities.find((o) => o.id === e.id)?.accountId ?? null;
+    case "thread":
+      return ws.data.threads.find((t) => t.id === e.id)?.accountId ?? null;
+    case "message":
+      return ws.data.threads.find((t) => t.messages.some((m) => m.id === e.id))?.accountId ?? null;
+    case "calculation": {
+      const [kind, id] = e.id.split(":");
+      if (kind === "health") return id;
+      if (kind === "margin") return ws.data.projects.find((p) => p.id === id)?.accountId ?? null;
+      return null;
+    }
+    default:
+      return undefined; // people and other non-account records
+  }
+}
+
+/**
+ * Final guard for scoped conversations: nothing about another account (in the
+ * answer, figures, evidence, caveats or suggested follow-ups) leaves a client-
+ * or project-scoped answer, whichever intent produced it.
+ */
+function enforceScope(r: AssistantResponse, c: Ctx): AssistantResponse {
+  const { ws, scopeAccount, scopeProject } = c;
+  if (!scopeAccount) return scopeProject ? { ...r, scope: { kind: "project", label: "This project", name: scopeProject.name } } : r;
+  const others = [...ws.data.accounts.filter((a) => a.id !== scopeAccount.id).map((a) => a.name), ...ws.data.projects.filter((p) => p.accountId && p.accountId !== scopeAccount.id).map((p) => p.name)];
+  const mentionsOther = (t: string) => others.some((n) => t.includes(n));
+  const inScope = (e: AssistantEvidence) => {
+    const acc = evidenceAccount(ws, e);
+    if (acc === undefined) return true;
+    if (acc !== scopeAccount.id) return false;
+    if (scopeProject && e.type === "project") return e.id === scopeProject.id;
+    return true;
+  };
+  return {
+    ...r,
+    scope: scopeProject ? { kind: "project", label: "This project", name: scopeProject.name } : { kind: "account", label: `This ${ws.profile.terms.account.toLowerCase()}`, name: scopeAccount.name },
+    answer: r.answer.filter((p) => !mentionsOther(p)),
+    figures: r.figures.filter((f) => !mentionsOther(f.label)),
+    evidence: r.evidence.filter((e) => inScope(e) && !mentionsOther(e.label)),
+    notes: r.notes.filter((n) => !mentionsOther(n)),
+    followUps: r.followUps.filter((f) => !mentionsOther(f)),
+  };
+}
+
 /* ------------------------------------------------------------------ */
 
 export function answerQuestion(ws: Workspace, req: AssistantRequest): AssistantResponse {
   const question = req.question.trim().slice(0, 600);
   if (!question) return response("empty", ws, { answer: ["Ask a question about your accounts, projects, finances or team."], insufficient: true });
-  const ents = resolveEntities(ws, question);
-  const scopeAccount = req.scope?.accountId ? ws.data.accounts.find((a) => a.id === req.scope!.accountId) : undefined;
+  const scopeProject = req.scope?.projectId ? ws.data.projects.find((p) => p.id === req.scope!.projectId) : undefined;
+  if (req.scope?.projectId && !scopeProject) return noAccess(ws, `You don't have access to this ${ws.profile.terms.project.toLowerCase()}.`);
+  const scopeAccountId = req.scope?.accountId ?? scopeProject?.accountId;
+  const scopeAccount = scopeAccountId ? ws.data.accounts.find((a) => a.id === scopeAccountId) : undefined;
   if (req.scope?.accountId && !scopeAccount) return noAccess(ws, "You don't have access to this account.");
+  const raw = resolveEntities(ws, question);
+  const ents: ResolvedEntities = scopeProject && !raw.projects.length ? { ...raw, projects: [scopeProject] } : raw;
+  const ctx: Ctx = { ws, req: { ...req, question }, ents, scopeAccount, scopeProject };
   if (scopeAccount && ents.accounts.some((a) => a.id !== scopeAccount.id)) {
-    return response("out_of_scope", ws, { answer: [`This assistant is scoped to ${scopeAccount.name}. Use the global assistant to ask about ${ents.accounts.filter((a) => a.id !== scopeAccount.id).map((a) => a.name).join(", ")}.`], insufficient: true });
+    return enforceScope(response("out_of_scope", ws, { answer: [`This conversation is limited to ${scopeProject ? scopeProject.name : scopeAccount.name}. Open the assistant from the header to ask about other ${ws.profile.terms.accounts.toLowerCase()}.`], insufficient: true }), ctx);
   }
   const intent = classify(question);
   if (ents.unmatchedAccountHint && intent !== "capacity" && intent !== "compensation") {
-    return response("not_found", ws, {
-      answer: ["I couldn't find a record you have access to that matches the name in your question, so I can't answer it without guessing."],
-      notes: ["The assistant only sees records your role is allowed to read."],
-      insufficient: true,
-      followUps: ["Which accounts need attention this week?"],
-    });
+    return enforceScope(
+      response("not_found", ws, {
+        answer: ["I couldn't find a record you have access to that matches the name in your question, so I can't answer it without guessing."],
+        notes: ["The assistant only sees records your role is allowed to read."],
+        insufficient: true,
+        followUps: [scopeAccount ? "What are the main risks right now?" : "Which accounts need attention this week?"],
+      }),
+      ctx,
+    );
   }
-  const ctx: Ctx = { ws, req: { ...req, question }, ents, scopeAccount };
+  return enforceScope(route(ctx, intent), ctx);
+}
+
+function route(ctx: Ctx, intent: Intent): AssistantResponse {
+  const { ws, ents, scopeAccount, scopeProject } = ctx;
   switch (intent) {
     case "compensation":
       return compensation(ctx);
@@ -625,13 +745,14 @@ export function answerQuestion(ws: Workspace, req: AssistantRequest): AssistantR
       return revenue(ctx);
     case "summary":
     case "unknown": {
+      if (scopeProject) return projectSummary(ctx, scopeProject);
       const account = scopeAccount ?? ents.accounts[0];
       if (account) return summary(ctx, account);
       if (ents.projects[0]) return blocker({ ...ctx, ents: { ...ents, projects: [ents.projects[0]] } });
       return response("unknown", ws, {
         answer: ["I don't have enough information to answer that from the records available to me. I can answer questions about account health, attention items, delivery blockers, margins, invoices and cash, capacity, renewals, opportunities and recent changes."],
         insufficient: true,
-        followUps: ["Which accounts need attention this week, and why?", "Which projects are forecast to miss their margin targets?", "What changed since last week?"],
+        followUps: ["Which accounts need attention this week, and why?", ...(ws.caps.viewProjectCosts ? ["Which projects are forecast to miss their margin targets?"] : []), "What changed since last week?"],
       });
     }
   }

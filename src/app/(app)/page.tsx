@@ -1,361 +1,130 @@
 import Link from "next/link";
-import { RevenueChart } from "@/components/Charts";
-import { AttentionRows, FeaturedAttention } from "@/components/blocks";
-import { Card, CardLink, EmptyState, HealthBadge, Notice, PageHeader, Section, Stat, Trend } from "@/components/ui";
+import { IssueCard, MetricCard } from "@/components/issues";
+import { Card, CardLink, EmptyState, Notice, PageHeader } from "@/components/ui";
+import { ChangeRow, WeeklyReport } from "@/components/weekly";
 import { getWorkspace } from "@/data/session";
-import { daysBetween, fmtDate, relativeDays } from "@/lib/dates";
-import { fmtPct } from "@/lib/money";
-import { viewHelpers } from "@/lib/view";
+import { fmtDate } from "@/lib/dates";
+import { homeFor } from "@/lib/home";
+import { buildIssues } from "@/lib/issues";
+import { ROLES } from "@/lib/permissions";
 
-export default async function OverviewPage() {
+const MOBILE_ISSUES = 3;
+const MOBILE_CHANGES = 3;
+
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const { view } = await searchParams;
   const ws = await getWorkspace();
-  const v = viewHelpers(ws);
-  const a = ws.analysis;
-  const t = ws.profile.terms;
-  const mode = ws.profile.modules.financeMode;
-  const fin = ws.finance;
-  const sym = v.money(0).replace(/[0-9.,\s]/g, "");
+  const weekly = view === "weekly";
+  const home = homeFor(ws);
+  const titles = Object.fromEntries(buildIssues(ws).map((i) => [i.id, i.title]));
+  const { counts } = home;
+  const hiddenUrgent = counts.urgent - counts.shownUrgent;
 
-  const moves = ws.data.accounts
-    .map((acc) => {
-      const h = a.health[acc.id];
-      const prev = a.healthPrev[acc.id];
-      return { acc, h, prev, delta: h?.score !== null && h?.score !== undefined && prev !== null && prev !== undefined ? h.score - prev : null };
-    })
-    .filter((x) => x.h);
-  const atRisk = moves.filter((x) => x.h.status === "at_risk" || x.h.status === "watch" || (x.delta !== null && x.delta <= -10)).sort((x, y) => (x.h.score ?? 101) - (y.h.score ?? 101));
-  const improving = moves.filter((x) => x.delta !== null && x.delta >= 5).sort((x, y) => (y.delta ?? 0) - (x.delta ?? 0));
-  const insufficient = moves.filter((x) => x.h.status === "insufficient");
-
-  const marginItems = a.attention.filter((i) => i.kind === "margin");
-  const scheduleItems = a.attention.filter((i) => i.kind === "schedule");
-  const renewals = a.renewals.filter((r) => daysBetween(ws.org.demoDate, r.renewalDate) <= 120);
-  const arr = ws.data.subscriptions.filter((s) => s.renewalDate >= ws.org.demoDate).reduce((s, x) => s + x.mrr * 12, 0);
-  const internal = ws.data.projects.filter((p) => p.billing === "internal" && p.status !== "completed");
-  const budgetTotal = internal.reduce((s, p) => s + (p.budgetCost ?? 0), 0);
-  const forecastTotal = internal.reduce((s, p) => s + (a.projectFin[p.id]?.cost.forecastTotal ?? 0), 0);
-  const stale = ws.data.connectors.filter((c) => c.state !== "healthy" && c.state !== "not_configured");
-  const critical = a.attention.filter((i) => i.severity === "critical").length;
-  const [top, ...rest] = a.attention;
+  const tabs = (
+    <nav aria-label="Home views" className="inline-flex rounded-full bg-surface p-1 ring-1 ring-inset ring-line">
+      <Link href="/" aria-current={!weekly ? "page" : undefined} className={`rounded-full px-3 py-1.5 text-sm font-medium no-underline ${!weekly ? "bg-ink text-white hover:text-white" : "text-ink-soft hover:text-ink"}`}>
+        Today
+      </Link>
+      <Link href="/?view=weekly" aria-current={weekly ? "page" : undefined} className={`rounded-full px-3 py-1.5 text-sm font-medium no-underline ${weekly ? "bg-ink text-white hover:text-white" : "text-ink-soft hover:text-ink"}`}>
+        Weekly report
+      </Link>
+    </nav>
+  );
 
   return (
-    <div className="space-y-10">
-      <PageHeader
-        eyebrow={`${ws.profile.label} · ${ws.org.name}`}
-        title={`Good morning, ${ws.user.name.split(" ")[0]}`}
-        subtitle={
-          <>
-            {a.attention.length > 0 ? (
-              <>
-                <strong className="font-semibold text-ink">{a.attention.length} items</strong> need a decision
-                {critical > 0 ? (
-                  <>
-                    , <strong className="font-semibold text-bad">{critical} critical</strong>
-                  </>
-                ) : null}
-                .{" "}
-              </>
-            ) : (
-              "Nothing needs a decision right now. "
-            )}
-            Results cover {a.period.label} ({fmtDate(a.period.start)} – {fmtDate(a.period.end)}) in {v.cur}.
-          </>
-        }
-        actions={
-          <Link href="/briefing" className="btn">
-            Weekly briefing
-          </Link>
-        }
-      />
+    <div className="space-y-8">
+      <PageHeader eyebrow={`${ROLES[ws.ctx.role].label} home · ${ws.org.name}`} title={weekly ? `Week ending ${fmtDate(ws.org.demoDate)}` : home.greeting} subtitle={weekly ? undefined : home.focus} actions={tabs} />
 
-      {fin && fin.summary.missing.length > 0 && (
-        <Notice title="Missing or partial data in this period">
-          <ul className="list-disc pl-5">
-            {fin.summary.missing.map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
-        </Notice>
-      )}
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 xl:gap-4">
-        {mode === "delivery" && fin && (
-          <>
-            <Stat label={fin.scope === "company" ? "Earned revenue" : "Earned revenue (your accounts)"} value={v.money(fin.summary.earnedRevenue, { compact: true })} sub={a.period.label} kind="calculated" href="/finance" />
-            <Stat label="Delivery margin" value={fmtPct(fin.summary.deliveryMargin)} sub={`${v.money(fin.summary.deliveryProfit, { compact: true })} after direct cost`} kind="calculated" href="/calculations#delivery-margin" tone={fin.summary.deliveryMargin !== null && fin.summary.deliveryMargin < 0.35 ? "warn" : undefined} />
-            <Stat label="Invoiced" value={v.money(fin.summary.invoiced, { compact: true })} sub="Issued in period" kind="observed" href="/finance#billing" />
-            <Stat label="Collected" value={v.money(fin.summary.collected, { compact: true })} sub="Payments received in period" kind="observed" href="/finance#billing" />
-          </>
-        )}
-        {mode === "subscription" && (
-          <>
-            <Stat label="ARR (active subscriptions)" value={ws.data.subscriptions.length ? v.money(arr, { compact: true }) : "—"} sub="MRR × 12 at the demo date" kind="calculated" href="/finance" />
-            {fin && <Stat label="Recognized revenue" value={v.money(fin.summary.earnedRevenue, { compact: true })} sub={a.period.label} kind="calculated" href="/finance" />}
-            <Stat label="Renewals in 120 days" value={renewals.length} sub={v.money(renewals.reduce((s, r) => s + r.annualValue, 0), { compact: true }) + " annual value"} kind="observed" href="#renewals" />
-          </>
-        )}
-        {mode === "budget" && (
-          <>
-            <Stat label="Approved initiative budget" value={v.money(budgetTotal, { compact: true })} sub={`${internal.length} active ${t.projects.toLowerCase()}`} kind="observed" href="/finance" />
-            {ws.caps.viewProjectCosts ? (
-              <Stat label="Forecast cost at completion" value={v.money(forecastTotal, { compact: true })} sub={`${forecastTotal > budgetTotal ? "over" : "under"} budget by ${v.money(Math.abs(forecastTotal - budgetTotal), { compact: true })}`} kind="calculated" tone={forecastTotal > budgetTotal ? "bad" : "good"} href="/finance" />
-            ) : (
-              <Stat label="Forecast cost" value="—" sub="Restricted for your role" />
-            )}
-          </>
-        )}
-        {ws.profile.modules.invoices && (ws.caps.viewCompanyFinance || ws.caps.viewProjectCosts) && (
-          <Stat label="Overdue receivables" value={v.money(a.receivables.totalOverdue, { compact: true })} sub={`${a.receivables.overdue.length} invoice${a.receivables.overdue.length === 1 ? "" : "s"} past due`} kind="observed" tone={a.receivables.totalOverdue > 0 ? "warn" : undefined} href="/finance#receivables" />
-        )}
-        {fin?.cash && <Stat label="13-week cash low point" value={v.money(fin.cash.lowPoint.closing, { compact: true })} sub={`Week of ${fmtDate(fin.cash.lowPoint.weekStart)}`} kind="calculated" tone={fin.cash.lowPoint.closing < 0 ? "bad" : undefined} href="/finance#cash" />}
-        <Stat
-          label={ws.profile.modules.billableUtilization ? "Billable utilization" : "Team planned load"}
-          value={ws.profile.modules.billableUtilization ? fmtPct(a.capacity.team.utilization) : `${a.capacity.overallocated.length} over`}
-          sub={ws.profile.modules.billableUtilization ? `Target ${fmtPct(ws.org.billableUtilizationTarget ?? null)} · ${a.capacity.overallocated.length} over-allocated` : "People above capacity in 2+ of the next 4 weeks"}
-          kind="calculated"
-          href="/team"
-          tone={a.capacity.overallocated.length ? "warn" : undefined}
-        />
-        {!fin && mode !== "budget" && <Stat label="Financial results" value="—" sub="Restricted for your role" />}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-8">
-        <section id="queue" className="scroll-mt-24 space-y-4" aria-labelledby="queue-title">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 id="queue-title" className="text-lg font-semibold tracking-tight">Needs your attention</h2>
-              <p className="mt-0.5 text-sm text-ink-muted">Ranked by severity, impact and how soon a decision is needed.</p>
-            </div>
-            <CardLink href="/actions">All actions</CardLink>
-          </div>
-          {top ? <FeaturedAttention ws={ws} item={top} /> : <EmptyState title="Nothing needs attention">Missing data would appear here, not be hidden.</EmptyState>}
-          {rest.length > 0 && (
-            <div className="card overflow-hidden">
-              <div className="flex items-center justify-between px-5 pb-1 pt-4">
-                <h3 className="text-[13px] font-semibold text-ink-soft">Up next</h3>
-                <span className="text-xs text-ink-faint">Impact · due</span>
+      {weekly ? (
+        <WeeklyReport ws={ws} />
+      ) : (
+        <>
+          <section aria-labelledby="brief-title" className="card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="brief-title" className="text-[15px] font-semibold tracking-tight">
+                Your briefing
+              </h2>
+              <div className="flex flex-wrap items-center gap-2 text-sm" role="status">
+                <span className={`rounded-full px-2.5 py-0.5 font-semibold ${counts.urgent ? "bg-bad-soft text-bad" : "bg-canvas text-ink-soft"}`}>{counts.urgent} urgent</span>
+                {ws.ctx.role === "executive" && counts.executive > 0 && <span className="rounded-full bg-violet-soft px-2.5 py-0.5 font-semibold text-violet">{counts.executive} need you</span>}
+                <Link href="/issues">{counts.total} open issues</Link>
               </div>
-              <AttentionRows ws={ws} items={rest.slice(0, 7)} start={2} />
-              {a.attention.length > 8 && (
-                <div className="border-t border-line px-5 py-3 text-[13px]">
-                  <Link href="/briefing#queue">See all {a.attention.length} items in the weekly briefing →</Link>
-                </div>
-              )}
+            </div>
+            <div className="mt-3 space-y-1.5 text-[15px] leading-relaxed text-ink">
+              {home.briefing.map((b, i) => (
+                <p key={i} className={i === 0 ? "font-medium" : "text-ink-soft"}>
+                  {b}
+                </p>
+              ))}
+            </div>
+          </section>
+
+          {home.dataWarnings.length > 0 && <Notice title="Some figures may be out of date">{home.dataWarnings.join(" ")}</Notice>}
+
+          {home.metrics.length > 0 && (
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+              {home.metrics.map((m) => (
+                <MetricCard key={m.label} m={m} />
+              ))}
             </div>
           )}
-        </section>
 
-        <div className="space-y-6">
-          <Card title={`${t.accounts} at risk or declining`} subtitle="Watch or at-risk status, or down 10+ points in 30 days" actions={<CardLink href="/accounts?status=risk">View</CardLink>}>
-            {atRisk.length === 0 ? (
-              <EmptyState title="None flagged" />
+          <section aria-labelledby="issues-title" className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 id="issues-title" className="text-lg font-semibold tracking-tight">
+                  What needs your attention
+                </h2>
+                <p className="mt-0.5 text-sm text-ink-muted">Related alerts are grouped into one issue with one owner and plan.</p>
+              </div>
+              <CardLink href="/issues">All issues</CardLink>
+            </div>
+            {home.issues.length === 0 ? (
+              <EmptyState title="Nothing needs your attention">Missing or stale data would appear here, not be hidden.</EmptyState>
+            ) : (
+              <div className="space-y-3">
+                {home.issues.map((i, n) => (
+                  // Phones show the top three; the rest are on the issues list.
+                  <div key={i.id} className={n >= MOBILE_ISSUES ? "hidden sm:block" : undefined}>
+                    <IssueCard ws={ws} issue={i} compact index={n + 1} titles={titles} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {counts.total > MOBILE_ISSUES && (
+              <p className="text-sm sm:hidden">
+                <Link href="/issues">
+                  See all {counts.total} issues{counts.urgent > 0 ? `, ${counts.urgent} urgent` : ""} →
+                </Link>
+              </p>
+            )}
+            {counts.total > home.issues.length && (
+              <p className="hidden text-sm sm:block">
+                <Link href="/issues">
+                  {counts.total - home.issues.length} more on the issues list{hiddenUrgent > 0 ? `, ${hiddenUrgent} of them urgent` : ""} →
+                </Link>
+              </p>
+            )}
+          </section>
+
+          <Card title={home.since.label} subtitle="Demo baseline: one week before today. Most significant changes first." actions={<CardLink href="/?view=weekly">Weekly report</CardLink>}>
+            {home.since.items.length === 0 ? (
+              <p className="text-sm text-ink-muted">Nothing changed in your scope since then.</p>
             ) : (
               <ul className="space-y-3">
-                {atRisk.slice(0, 6).map(({ acc, h, delta }) => (
-                  <li key={acc.id} className="flex items-center justify-between gap-3 text-sm">
-                    <Link href={`/accounts/${acc.id}`} className="link-quiet flex min-w-0 items-center gap-2.5 font-medium">
-                      <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-canvas text-[10px] font-semibold text-ink-soft ring-1 ring-inset ring-line">{acc.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("")}</span>
-                      <span className="truncate">{acc.name}</span>
-                    </Link>
-                    <span className="flex items-center gap-2">
-                      <Trend delta={delta} />
-                      <HealthBadge status={h.status} score={h.score} />
-                    </span>
-                  </li>
+                {home.since.items.map((c, i) => (
+                  <ChangeRow key={i} ws={ws} c={c} className={i >= MOBILE_CHANGES ? "hidden sm:list-item" : ""} />
                 ))}
               </ul>
             )}
-            {insufficient.length > 0 && (
-              <div className="mt-3 border-t border-line pt-3">
-                <div className="mb-1 text-xs font-medium text-ink-muted">Not enough current information (not assumed healthy)</div>
-                <ul className="space-y-1 text-sm">
-                  {insufficient.map(({ acc, h }) => (
-                    <li key={acc.id}>
-                      <Link href={`/accounts/${acc.id}#health`}>{acc.name}</Link> <span className="text-xs text-ink-muted">· {h.dataGaps[0]}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {home.since.more > 0 && (
+              <p className="mt-3 text-sm">
+                <Link href="/?view=weekly">{home.since.more} more changes in the weekly report →</Link>
+              </p>
             )}
           </Card>
-
-          <Card title={`${t.accounts} improving`}>
-            {improving.length === 0 ? (
-              <p className="text-sm text-ink-muted">{`No ${t.account.toLowerCase()} improved by 5+ points in 30 days.`}</p>
-            ) : (
-              <ul className="space-y-3">
-                {improving.slice(0, 5).map(({ acc, h, delta }) => (
-                  <li key={acc.id} className="flex items-center justify-between gap-3 text-sm">
-                    <Link href={`/accounts/${acc.id}`} className="link-quiet flex min-w-0 items-center gap-2.5 font-medium">
-                      <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-canvas text-[10px] font-semibold text-ink-soft ring-1 ring-inset ring-line">{acc.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("")}</span>
-                      <span className="truncate">{acc.name}</span>
-                    </Link>
-                    <span className="flex items-center gap-2">
-                      <Trend delta={delta} />
-                      <HealthBadge status={h.status} score={h.score} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          {mode !== "budget" && (
-          <Card id="renewals" title="Upcoming renewals" subtitle="Next 120 days">
-            {renewals.length === 0 ? (
-              <p className="text-sm text-ink-muted">No renewals in the next 120 days.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {renewals.map((r) => {
-                  const h = a.health[r.accountId];
-                  return (
-                    <li key={r.contractId} className="flex items-start justify-between gap-2">
-                      <div>
-                        <Link href={`/accounts/${r.accountId}`}>{v.account(r.accountId)}</Link>
-                        <div className="text-xs text-ink-muted">
-                          {fmtDate(r.renewalDate)} ({relativeDays(ws.org.demoDate, r.renewalDate)}){r.noticeDate ? ` · notice by ${fmtDate(r.noticeDate)}` : ""}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="tabular-nums">{v.money(r.annualValue, { compact: true })}</div>
-                        {h && <HealthBadge status={h.status} score={h.score} />}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
-
-          )}
-
-          <Card title="Data freshness" subtitle="Simulated connectors" actions={<CardLink href="/integrations">Details</CardLink>}>
-            <ul className="space-y-1.5 text-sm">
-              {ws.data.connectors.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2">
-                  <span>{c.provider}</span>
-                  <span className={`text-xs ${c.state === "healthy" ? "text-good" : c.state === "not_configured" ? "text-ink-muted" : "text-warn"}`}>
-                    {c.state.replace("_", " ")}
-                    {c.lastSuccessfulSync ? ` · ${relativeDays(ws.org.demoDate, c.lastSuccessfulSync.slice(0, 10))}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {stale.length > 0 && <p className="mt-2 text-xs text-warn">Figures depending on {stale.map((c) => c.provider).join(", ")} may be incomplete.</p>}
-          </Card>
-        </div>
-      </div>
-
-      {fin?.scope === "company" && fin.monthly.length > 0 && mode !== "budget" && (
-        <Card title={mode === "subscription" ? "Recognized revenue and direct cost" : "Revenue, cost and margin"} subtitle={mode === "subscription" ? "Recognized revenue = MRR for each completed subscription month. Direct cost covers client-billed work only." : "Delivery margin = (earned revenue − direct labor, contractor and project expenses) ÷ earned revenue"} actions={<CardLink href="/calculations#delivery-margin">Formula</CardLink>}>
-          <RevenueChart data={fin.monthly} symbol={sym} title={mode === "subscription" ? "Recognized revenue vs direct cost by month" : "Earned revenue vs direct cost by month"} />
-        </Card>
+        </>
       )}
-
-      <Section title="Delivery" subtitle={`${t.projects} forecast to miss targets or running late`}>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card title={mode === "budget" ? "Budget problems" : "Margin problems"} subtitle={mode === "delivery" ? "Projects forecast at least 5 points below target margin" : "Initiatives forecast over approved budget"}>
-          {!ws.caps.viewProjectCosts ? (
-            <p className="text-sm text-ink-muted">Project costs are restricted for your role.</p>
-          ) : marginItems.length === 0 ? (
-            <p className="text-sm text-ink-muted">None.</p>
-          ) : (
-            <div className="-mx-5 -mb-5">
-              <AttentionRows ws={ws} items={marginItems} />
-            </div>
-          )}
-        </Card>
-        <Card title="Schedule problems" subtitle="Late, blocked, slipped, or waiting on approval">
-          {scheduleItems.length === 0 ? (
-            <p className="text-sm text-ink-muted">None.</p>
-          ) : (
-            <div className="-mx-5 -mb-5">
-              <AttentionRows ws={ws} items={scheduleItems} />
-            </div>
-          )}
-        </Card>
-      </div>
-      </Section>
-
-      <Section title="Cash and capacity" subtitle="Receivables, team load and growth">
-      <div className="grid gap-6 lg:grid-cols-2">
-        {ws.profile.modules.invoices && (ws.caps.viewCompanyFinance || ws.caps.viewProjectCosts) && (
-          <Card title="Overdue invoices" actions={<CardLink href="/finance#receivables">AR aging</CardLink>}>
-            {a.receivables.overdue.length === 0 ? (
-              <p className="text-sm text-ink-muted">No overdue invoices.</p>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr>
-                    <th className="th">Invoice</th>
-                    <th className="th">{t.account}</th>
-                    <th className="th num">Outstanding</th>
-                    <th className="th num">Days overdue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {a.receivables.overdue.map((s) => (
-                    <tr key={s.invoice.id}>
-                      <td className="td">
-                        <Link href={`/finance/invoices/${s.invoice.id}`}>{s.invoice.number}</Link>
-                      </td>
-                      <td className="td">{v.account(s.invoice.accountId)}</td>
-                      <td className="td num">{v.money(s.outstanding)}</td>
-                      <td className={`td num ${s.daysOverdue > 60 ? "text-bad" : s.daysOverdue > 30 ? "text-warn" : ""}`}>{s.daysOverdue}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
-        )}
-        <Card title="Capacity" subtitle="Planned load over the next 4 weeks" actions={<CardLink href="/team">Team</CardLink>}>
-          {a.capacity.overallocated.length === 0 ? (
-            <p className="text-sm text-ink-muted">Nobody is planned above capacity.</p>
-          ) : (
-            <ul className="space-y-1.5 text-sm">
-              {a.capacity.overallocated.map((pc) => (
-                <li key={pc.person.id} className="flex justify-between gap-2">
-                  <Link href={`/team#${pc.person.id}`}>
-                    {pc.person.name} <span className="text-xs text-ink-muted">({pc.person.role})</span>
-                  </Link>
-                  <span className="tabular-nums text-bad">peak {fmtPct(pc.upcoming.peakPct)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-3 border-t border-line pt-3 text-xs text-ink-soft">
-            Free capacity by role (avg hours/week, next 8 weeks):{" "}
-            {a.capacity.byRole
-              .filter((r) => r.people > 0)
-              .map((r) => `${r.role} ${Math.round(r.weeklyFree)}h`)
-              .join(" · ")}
-          </div>
-        </Card>
-        {ws.profile.modules.expansion && (
-          <Card title="Expansion opportunities" subtitle="From client messages. Manual estimates are never counted as revenue." actions={<CardLink href="/signals?tab=opportunities">All</CardLink>}>
-            {a.opportunities.filter((o) => o.status !== "dismissed").length === 0 ? (
-              <p className="text-sm text-ink-muted">No open opportunities.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {a.opportunities
-                  .filter((o) => o.status !== "dismissed")
-                  .map((o) => (
-                    <li key={o.id}>
-                      <Link href={`/signals?tab=opportunities#${o.id}`}>
-                        {v.account(o.accountId)}: {o.offering}
-                      </Link>
-                      <div className="text-xs text-ink-muted">
-                        {o.readiness} · {o.estimatedValue !== null ? `${v.money(o.estimatedValue, { compact: true })} manual estimate` : "not estimated"}
-                      </div>
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </Card>
-        )}
-      </div>
-      </Section>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { CurrencyForm, MembersManager, ResetButton } from "@/components/forms";
-import { Card, DefList, PageHeader } from "@/components/ui";
+import { Card, CardLink, DefList, PageHeader } from "@/components/ui";
 import { getMember } from "@/data/member";
+import { persistenceDescription } from "@/data/persistence";
 import { getWorkspace, readStore } from "@/data/session";
 import { PROFILES } from "@/domain/profiles";
 import type { RoleId } from "@/domain/types";
@@ -9,19 +10,6 @@ import { DEMO_FX_TO_USD } from "@/lib/money";
 import { ROLES } from "@/lib/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { PUBLIC_DEMO } from "@/lib/supabase/config";
-
-const CAP_LABELS: [keyof (typeof ROLES)["executive"]["caps"], string][] = [
-  ["allAccounts", "All accounts"],
-  ["viewCompensation", "Individual compensation"],
-  ["viewCompanyFinance", "Company finance and cash"],
-  ["viewProjectCosts", "Project costs and margins"],
-  ["communications", "Communications"],
-  ["manageActions", "Create and update actions"],
-  ["reviewSignals", "Review signals"],
-  ["applyScenarios", "Apply what-if scenarios"],
-  ["manageIntegrations", "Manage integrations and mappings"],
-  ["importDatasets", "Sheets imports"],
-];
 
 export default async function SettingsPage() {
   const ws = await getWorkspace();
@@ -39,7 +27,16 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings and demo controls" subtitle={member ? `Signed in as ${member.email} (${ROLES[member.role].label}). ${member.role === "executive" ? "As an executive you can preview other roles from the header." : ""}` : PUBLIC_DEMO ? "Public preview. Anyone with the link can view and try the synthetic demo; changes go to a shared sandbox." : "Local demo. The role switcher simulates who is signed in; it is not authentication."} />
+      <PageHeader
+        title="Settings and demo controls"
+        subtitle={
+          member
+            ? `Signed in as ${member.email} (${ROLES[member.role].label}). ${member.role === "executive" ? "As an executive you can preview other roles from the header." : ""}`
+            : PUBLIC_DEMO
+              ? "Public preview. Anyone with the link can view and try the synthetic demo; changes go to a shared sandbox."
+              : "Local demo. The role switcher simulates who is signed in; it is not authentication."
+        }
+      />
       {members && member && (
         <Card title="People with access" subtitle="Only these Google accounts can sign in. Their role decides what data is loaded for them.">
           <MembersManager members={members} me={member.email} />
@@ -70,57 +67,25 @@ export default async function SettingsPage() {
           </div>
         </Card>
         <Card title="Reset demo">
-          <p className="mb-3 text-sm text-ink-soft">Edits (actions, comments, signal reviews, opportunity estimates, applied scenarios, mapping decisions, imports and currency) are {member ? "saved in the shared database, so everyone with access sees them" : <>stored locally in <code>.data/demo-state.json</code></>}. Resetting restores the original synthetic data for all three profiles.</p>
+          <p className="mb-3 text-sm text-ink-soft">
+            Edits (actions, comments, signal reviews, opportunity estimates, applied scenarios, mapping decisions, imports and currency) are {persistenceDescription().text}. Resetting restores the original synthetic data for all three
+            profiles.
+          </p>
           {!member || member.role === "executive" ? <ResetButton /> : <p className="text-xs text-ink-muted">Only executives can reset the shared demo data.</p>}
         </Card>
       </div>
 
-      <Card title="Roles and permissions" subtitle="Enforced in the data layer before any screen or the assistant receives data" padded={false}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px]">
-            <thead>
-              <tr>
-                <th className="th">Capability</th>
-                {roles.map((r) => (
-                  <th key={r} className={`th ${r === ws.ctx.role ? "text-accent" : ""}`}>
-                    {ROLES[r].label}
-                    {r === ws.ctx.role ? " (you)" : ""}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {CAP_LABELS.map(([k, label]) => (
-                <tr key={k}>
-                  <td className="td">{label}</td>
-                  {roles.map((r) => {
-                    const val = ROLES[r].caps[k];
-                    return (
-                      <td key={r} className="td text-sm">
-                        {val === true ? <span className="text-good">✓ Yes</span> : val === false ? <span className="text-ink-muted">✗ No</span> : <span>{String(val).replace("_", " ")}</span>}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-              <tr>
-                <td className="td">Demo persona</td>
-                {roles.map((r) => (
-                  <td key={r} className="td text-sm">
-                    {ws.data.people.find((p) => p.id === ws.org.demoPersonas[r])?.name}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <ul className="space-y-1 px-4 py-3 text-xs text-ink-soft">
-          {roles.map((r) => (
-            <li key={r}>
-              <strong>{ROLES[r].label}:</strong> {ROLES[r].description}
-            </li>
+      <Card title="Roles and permissions" actions={<CardLink href="/admin#access">Who can see what</CardLink>}>
+        <p className="text-sm text-ink-soft">
+          Each role loads only the data it is allowed to see. The full capability matrix is in Administration. Demo personas:{" "}
+          {roles.map((r, i) => (
+            <span key={r}>
+              {i > 0 && ", "}
+              {ROLES[r].label} {ws.data.people.find((p) => p.id === ws.org.demoPersonas[r])?.name}
+            </span>
           ))}
-        </ul>
+          .
+        </p>
       </Card>
 
       <Card title="Business profiles" subtitle="Switch profiles in the header. Each has its own organization, data, terminology and modules." padded={false}>
@@ -140,19 +105,25 @@ export default async function SettingsPage() {
               <tr>
                 <td className="td">Accounts are</td>
                 {Object.values(PROFILES).map((p) => (
-                  <td key={p.id} className="td">{p.terms.accounts}</td>
+                  <td key={p.id} className="td">
+                    {p.terms.accounts}
+                  </td>
                 ))}
               </tr>
               <tr>
                 <td className="td">Work is</td>
                 {Object.values(PROFILES).map((p) => (
-                  <td key={p.id} className="td">{p.terms.projects}</td>
+                  <td key={p.id} className="td">
+                    {p.terms.projects}
+                  </td>
                 ))}
               </tr>
               <tr>
                 <td className="td">Finance mode</td>
                 {Object.values(PROFILES).map((p) => (
-                  <td key={p.id} className="td">{p.modules.financeMode}</td>
+                  <td key={p.id} className="td">
+                    {p.modules.financeMode}
+                  </td>
                 ))}
               </tr>
               {(["billableUtilization", "invoices", "projectMargins", "subscriptions", "expansion"] as const).map((m) => (

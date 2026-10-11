@@ -48,7 +48,7 @@ export function ActionForm({
   people,
   defaults,
   canManage,
-  label = "Create action",
+  label = "Create plan",
   defaultOpen = false,
   minDate,
 }: {
@@ -84,7 +84,7 @@ export function ActionForm({
         e.preventDefault();
         run(
           () => createActionAction({ title, description, ownerId, dueDate, severity, impact, accountId: defaults.accountId, links: defaults.links ?? [], origin: defaults.origin ?? "user" }),
-          "Action created. It now appears on the Actions page.",
+          "Plan created. It now appears under Plans.",
           () => setOpen(false),
         );
       }}
@@ -129,13 +129,13 @@ export function ActionForm({
       {(defaults.links?.length ?? 0) > 0 && <p className="text-xs text-ink-muted">{defaults.links!.length} evidence link(s) will be attached.</p>}
       <div className="flex gap-2">
         <button className="btn btn-primary" disabled={pending || !title.trim()}>
-          {pending ? "Saving…" : "Save action"}
+          {pending ? "Saving…" : "Save plan"}
         </button>
         <button type="button" className="btn" onClick={() => setOpen(false)}>
           Cancel
         </button>
       </div>
-      <p className="text-[11px] text-ink-muted">Saved locally in the demo. No email or Slack message is sent.</p>
+      <p className="text-[11px] text-ink-muted">Saved to this demo&rsquo;s shared data, which everyone using the demo sees. No email or Slack message is sent.</p>
       <Feedback error={error} message={message} />
     </form>
   );

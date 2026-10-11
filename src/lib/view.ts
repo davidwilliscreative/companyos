@@ -34,13 +34,17 @@ export function viewHelpers(ws: Workspace) {
         case "message":
           return "Message";
         case "signal":
-          return "Signal";
+          return ws.analysis.signals.find((s) => s.id === l.id)?.summary ?? "Signal";
         case "person":
           return people.get(l.id)?.name ?? "Person";
         case "calculation":
           return "Calculation";
-        case "opportunity":
-          return "Opportunity";
+        case "opportunity": {
+          const o = ws.analysis.opportunities.find((x) => x.id === l.id);
+          return o ? `${accounts.get(o.accountId)?.name ?? ""}: ${o.offering}` : "Opportunity";
+        }
+        case "issue":
+          return "Issue";
       }
     },
   };

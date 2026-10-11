@@ -2,9 +2,66 @@
 
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import type { AssistantResponse } from "@/lib/assistant/types";
+
+/**
+ * One assistant, one drawer. Detail pages register the record being viewed so
+ * the drawer opens scoped to "This client" or "This project"; elsewhere it is
+ * scoped to everything the role can see ("My accounts" or "Company-wide").
+ */
+export interface PageScope {
+  kind: "account" | "project";
+  id: string;
+  label: string;
+  name: string;
+  suggestions: string[];
+}
+
+type Listener = () => void;
+const store = { scope: null as PageScope | null, open: false, listeners: new Set<Listener>() };
+const emit = () => store.listeners.forEach((l) => l());
+const subscribe = (l: Listener) => {
+  store.listeners.add(l);
+  return () => store.listeners.delete(l);
+};
+function setOpen(open: boolean) {
+  store.open = open;
+  emit();
+}
+let snap = { scope: store.scope, open: store.open };
+function getSnap() {
+  if (snap.scope !== store.scope || snap.open !== store.open) snap = { scope: store.scope, open: store.open };
+  return snap;
+}
+
+/** Registers the record a detail page is about, for as long as the page is shown. */
+export function AssistantScope(props: PageScope) {
+  const { kind, id, label, name } = props;
+  const key = props.suggestions.join("|");
+  useEffect(() => {
+    store.scope = { kind, id, label, name, suggestions: key.split("|") };
+    emit();
+    return () => {
+      if (store.scope?.id === id) {
+        store.scope = null;
+        emit();
+      }
+    };
+  }, [kind, id, label, name, key]);
+  return null;
+}
+
+/** An in-page entry point that opens the shared drawer in the page's scope. */
+export function AskAssistantButton({ label }: { label: string }) {
+  return (
+    <button className="btn" onClick={() => setOpen(true)} aria-haspopup="dialog">
+      <Sparkles aria-hidden="true" size={14} className="text-accent" />
+      {label}
+    </button>
+  );
+}
 
 interface Turn {
   q: string;
@@ -19,7 +76,7 @@ const KIND_CLS: Record<string, string> = {
   estimate: "bg-warn-soft text-warn",
 };
 
-export function AssistantChat({ accountId, accountName, suggestions, autoFocus = false }: { accountId?: string; accountName?: string; suggestions: string[]; autoFocus?: boolean }) {
+function AssistantChat({ scope, suggestions, autoFocus = false }: { scope: PageScope | null; suggestions: string[]; autoFocus?: boolean }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +96,7 @@ export function AssistantChat({ accountId, accountName, suggestions, autoFocus =
     setQ("");
     setTurns((t) => [...t, { q: question }]);
     try {
-      const res = await fetch("/api/assistant", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question, accountId }) });
+      const res = await fetch("/api/assistant", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question, accountId: scope?.kind === "account" ? scope.id : undefined, projectId: scope?.kind === "project" ? scope.id : undefined }) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `Request failed (${res.status})`);
       const a = (await res.json()) as AssistantResponse;
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, a } : x)));
@@ -54,7 +111,7 @@ export function AssistantChat({ accountId, accountName, suggestions, autoFocus =
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-2 rounded-lg border border-warn-line bg-warn-soft px-3 py-2 text-xs text-warn">
-        <strong>Simulated assistant.</strong> No AI service is connected. Answers are composed deterministically from {accountName ? `${accountName}'s` : "your permitted"} records and the same calculations as the dashboard. Read-only.
+        <strong>Simulated assistant.</strong> No AI service is connected. Answers are composed from {scope ? `${scope.name}'s` : "your permitted"} records using the same calculations as the dashboard. It cannot change anything.
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">
         {turns.length === 0 && (
@@ -86,10 +143,10 @@ export function AssistantChat({ accountId, accountName, suggestions, autoFocus =
           ask(q);
         }}
       >
-        <label htmlFor={`ask-${accountId ?? "global"}`} className="sr-only">
+        <label htmlFor="ask-assistant" className="sr-only">
           Ask a question
         </label>
-        <input id={`ask-${accountId ?? "global"}`} ref={inputRef} className="input" placeholder={accountName ? `Ask about ${accountName}…` : "Ask about accounts, projects, cash, capacity…"} value={q} onChange={(e) => setQ(e.target.value)} maxLength={600} />
+        <input id="ask-assistant" ref={inputRef} className="input" placeholder={scope ? `Ask about ${scope.name}…` : "Ask about accounts, projects, cash, capacity…"} value={q} onChange={(e) => setQ(e.target.value)} maxLength={600} />
         <button className="btn btn-primary" disabled={busy || !q.trim()}>
           Ask
         </button>
@@ -102,7 +159,7 @@ function Answer({ a, onFollowUp }: { a: AssistantResponse; onFollowUp: (q: strin
   return (
     <div className="rounded-lg border border-line bg-white p-3 text-sm">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
-        <span className="rounded bg-warn-soft px-1.5 py-0.5 font-medium text-warn">{a.provider.label}</span>
+        <span className="rounded bg-canvas px-1.5 py-0.5 font-medium text-ink-soft">Scope: {a.scope.label}{a.scope.name ? ` · ${a.scope.name}` : ""}</span>
         <span>{a.period}</span>
         {a.insufficient && <span className="rounded bg-canvas px-1.5 py-0.5 font-medium text-ink-soft">Insufficient information</span>}
       </div>
@@ -160,16 +217,34 @@ function Answer({ a, onFollowUp }: { a: AssistantResponse; onFollowUp: (q: strin
   );
 }
 
-export function AssistantDrawer({ suggestions }: { suggestions: string[] }) {
-  const [open, setOpen] = useState(false);
+export function AssistantDrawer({ suggestions, broadScope }: { suggestions: string[]; broadScope: string }) {
+  const { scope: pageScope, open } = useSyncExternalStore(subscribe, getSnap, getSnap);
+  const [useBroad, setUseBroad] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const scope = useBroad ? null : pageScope;
+  useEffect(() => setUseBroad(false), [pageScope?.id]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((x) => !x);
+        setOpen(!store.open);
       }
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape" && store.open) setOpen(false);
+      // Keep keyboard focus inside the open drawer.
+      if (e.key === "Tab" && store.open && dialogRef.current) {
+        const f = [...dialogRef.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input, select, textarea")];
+        if (!f.length) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -188,23 +263,41 @@ export function AssistantDrawer({ suggestions }: { suggestions: string[] }) {
       </button>
       {open &&
         createPortal(
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <button aria-label="Close assistant" className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
-          <div role="dialog" aria-modal="true" aria-label="CompanyOS assistant" className="relative flex h-full w-full max-w-xl flex-col border-l border-line bg-canvas p-5 shadow-pop">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-base font-semibold tracking-tight"><Sparkles aria-hidden="true" size={16} className="text-accent" />Assistant</div>
-                <div className="text-xs text-ink-muted">Company-wide, limited to what your role can see</div>
+          <div className="fixed inset-0 z-50 flex justify-end">
+            <button aria-label="Close assistant" tabIndex={-1} className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="CompanyOS assistant" className="relative flex h-full w-full max-w-xl flex-col border-l border-line bg-canvas p-4 shadow-pop sm:p-5">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-base font-semibold tracking-tight">
+                    <Sparkles aria-hidden="true" size={16} className="text-accent" />
+                    Assistant
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-soft">
+                    <span>Scope:</span>
+                    {pageScope ? (
+                      <div role="group" aria-label="Assistant scope" className="inline-flex rounded-full bg-surface p-0.5 ring-1 ring-inset ring-line">
+                        <button aria-pressed={!useBroad} onClick={() => setUseBroad(false)} className={`rounded-full px-2 py-0.5 ${!useBroad ? "bg-ink font-medium text-white" : "text-ink-soft"}`}>
+                          {pageScope.label}: {pageScope.name}
+                        </button>
+                        <button aria-pressed={useBroad} onClick={() => setUseBroad(true)} className={`rounded-full px-2 py-0.5 ${useBroad ? "bg-ink font-medium text-white" : "text-ink-soft"}`}>
+                          {broadScope}
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="rounded-full bg-surface px-2 py-0.5 font-medium text-ink ring-1 ring-inset ring-line">{broadScope}</span>
+                    )}
+                    <span className="text-ink-muted">· limited to what your role can see</span>
+                  </div>
+                </div>
+                <button className="btn" onClick={() => setOpen(false)}>
+                  Close <span className="sr-only">assistant</span>
+                </button>
               </div>
-              <button className="btn" onClick={() => setOpen(false)}>
-                Close <span className="sr-only">assistant</span>
-              </button>
+              <div className="min-h-0 flex-1">
+                <AssistantChat key={scope?.id ?? "broad"} scope={scope} suggestions={scope ? scope.suggestions : suggestions} autoFocus />
+              </div>
             </div>
-            <div className="min-h-0 flex-1">
-              <AssistantChat suggestions={suggestions} autoFocus />
-            </div>
-          </div>
-        </div>,
+          </div>,
           document.body,
         )}
     </>

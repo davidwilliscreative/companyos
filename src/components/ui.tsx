@@ -259,11 +259,36 @@ export function Bar({ value, max = 1, tone = "accent", label }: { value: number;
 }
 
 export function SourceTag({ system, detail }: { system: string; detail?: string }) {
-  const label: Record<string, string> = { seed: "Demo seed", sheets: "Google Sheets (simulated)", clickup: "ClickUp (simulated)", gmail: "Gmail (simulated)", slack: "Slack (simulated)", accounting: "Accounting (simulated)", manual: "Manual" };
+  const label: Record<string, string> = { seed: "Demo data", sheets: "Google Sheets (simulated)", clickup: "ClickUp (simulated)", gmail: "Gmail (simulated)", slack: "Slack (simulated)", accounting: "Accounting (simulated)", manual: "Manual" };
   return (
     <span className="text-[11px] text-ink-muted" title={detail}>
       Source: {label[system] ?? system}
       {detail ? ` · ${detail}` : ""}
     </span>
+  );
+}
+
+/** Section tabs as links (?tab=…), so each view has its own URL and works without JavaScript. */
+export function Tabs({ base, tabs, current }: { base: string; tabs: { key: string; label: string; count?: number }[]; current: string }) {
+  return (
+    <nav aria-label="Sections" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <ul className="flex min-w-max gap-1 border-b border-line">
+        {tabs.map((t) => {
+          const active = t.key === current;
+          return (
+            <li key={t.key}>
+              <Link
+                href={t.key === tabs[0].key ? base : `${base}?tab=${t.key}`}
+                aria-current={active ? "page" : undefined}
+                className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium no-underline ${active ? "border-ink text-ink" : "border-transparent text-ink-soft hover:border-line-strong hover:text-ink"}`}
+              >
+                {t.label}
+                {t.count !== undefined && t.count > 0 && <span className="rounded-full bg-canvas px-1.5 text-xs text-ink-soft ring-1 ring-inset ring-line">{t.count}</span>}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

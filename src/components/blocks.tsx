@@ -214,6 +214,17 @@ export function AttentionList({ ws, items, limit, showCreate = true }: { ws: Wor
   );
 }
 
+/**
+ * One review state per signal. A thread that resolved itself but nobody has
+ * confirmed reads "Appears resolved · awaiting confirmation", never both
+ * "Resolved" and "Unreviewed"; a dismissed signal with new messages says why it is back.
+ */
+export function SignalReviewBadge({ s }: { s: Signal }) {
+  if (s.newEvidenceSinceReview) return <Badge tone="warn" icon="↻" title={s.review.note}>Reopened: new evidence {fmtDate(s.lastEvidenceOn)}</Badge>;
+  if (s.autoResolved && s.review.status === "unreviewed") return <Badge tone="good" icon="✓" title="Later messages in the same thread suggest this was resolved. Confirm to close it.">Appears resolved · awaiting confirmation</Badge>;
+  return <ReviewBadge status={s.review.status} />;
+}
+
 export function SignalRow({ ws, s }: { ws: Workspace; s: Signal }) {
   const v = viewHelpers(ws);
   return (
@@ -221,10 +232,8 @@ export function SignalRow({ ws, s }: { ws: Workspace; s: Signal }) {
       <div className="flex flex-wrap items-center gap-2">
         <SeverityBadge severity={s.severity} />
         <ConfidenceBadge confidence={s.confidence} reason={s.confidenceReason} />
-        <ReviewBadge status={s.review.status} />
-        {s.autoResolved && <Badge tone="good">Resolved in thread</Badge>}
-        {s.newEvidenceSinceReview && <Badge tone="warn">New evidence since dismissal</Badge>}
-        {s.counterEvidence.length > 0 && <Badge tone="neutral">{s.counterEvidence.length} contradicting</Badge>}
+        <SignalReviewBadge s={s} />
+        {s.counterEvidence.some((e) => e.relation === "contradicts") && <Badge tone="neutral">{s.counterEvidence.filter((e) => e.relation === "contradicts").length} contradicting</Badge>}
       </div>
       <div className="mt-1">
         <Link href={`/signals/${s.id}`} className="font-medium text-ink hover:text-accent">

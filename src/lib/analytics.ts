@@ -2,6 +2,7 @@ import type { Dataset, EvidenceLink, ID, ISODate, Opportunity, Severity, Signal 
 import { getProfile } from "@/domain/profiles";
 import type { OrgOverlay } from "@/data/state";
 import { addDays, daysBetween, fmtDate } from "@/lib/dates";
+import { fmtMoney } from "@/lib/money";
 import { capacityOverview, type CapacityOverview } from "./calc/capacity";
 import { periodByKey, receivables, type Period } from "./calc/company";
 import { milestoneState, projectFinancials, type MilestoneState, type ProjectFinancials } from "./calc/finance";
@@ -44,7 +45,7 @@ export interface Analysis {
   receivables: ReturnType<typeof receivables>;
   capacity: CapacityOverview;
   attention: AttentionItem[];
-  renewals: { accountId: ID; contractId: ID; name: string; renewalDate: ISODate; noticeDate: ISODate | null; annualValue: number }[];
+  renewals: { accountId: ID; contractId: ID; name: string; renewalDate: ISODate; noticeDate: ISODate | null; /** null when the role may not see contract values. */ annualValue: number | null }[];
 }
 
 const SEV_W: Record<Severity, number> = { low: 1, medium: 2, high: 3, critical: 4 };
@@ -177,14 +178,14 @@ export function computeAnalysis(ds: Dataset, overlay: OrgOverlay | null, periodK
       const gap = f.margin.forecastAtCompletion - f.margin.target;
       if (gap > -0.05) continue;
       const shortfall = (f.revenue.atCompletion ?? 0) * f.margin.target - (f.margin.forecastProfit ?? 0);
-      add({ id: `att_margin_${p.id}`, kind: "margin", title: `${p.name} forecast margin ${(f.margin.forecastAtCompletion * 100).toFixed(0)}% vs ${(f.margin.target * 100).toFixed(0)}% target`, why: f.unbilled.items.length ? `${f.unbilled.items.map((u) => u.label).join("; ")}.` : `Forecast cost ${Math.round(f.cost.forecastTotal).toLocaleString()} against revenue ${Math.round(f.revenue.atCompletion ?? 0).toLocaleString()}.`, next: "Review the calculation, then test pricing or staffing in the what-if calculator before the next client conversation.", severity: gap < -0.25 ? "high" : "medium", impactValue: shortfall, impactLabel: "Profit below target at completion", ownerId: p.ownerId, dueDate: addDays(asOf, 7), accountId: p.accountId, projectId: p.id, links: [{ type: "project", id: p.id }, { type: "calculation", id: `margin:${p.id}` }] });
+      add({ id: `att_margin_${p.id}`, kind: "margin", title: `${p.name} forecast margin ${(f.margin.forecastAtCompletion * 100).toFixed(0)}% vs ${(f.margin.target * 100).toFixed(0)}% target`, why: f.unbilled.items.length ? `${f.unbilled.items.map((u) => u.label).join("; ")}.` : `Forecast cost ${fmtMoney(f.cost.forecastTotal, ds.org.reportingCurrency, { compact: true })} against revenue ${fmtMoney(f.revenue.atCompletion ?? 0, ds.org.reportingCurrency, { compact: true })}.`, next: "Review the calculation, then test pricing or staffing in the what-if calculator before the next client conversation.", severity: gap < -0.25 ? "high" : "medium", impactValue: shortfall, impactLabel: "Profit below target at completion", ownerId: p.ownerId, dueDate: addDays(asOf, 7), accountId: p.accountId, projectId: p.id, links: [{ type: "project", id: p.id }, { type: "calculation", id: `margin:${p.id}` }] });
     }
   }
   for (const p of ds.projects) {
     if (p.billing !== "internal" || p.status === "completed") continue;
     const f = projectFin[p.id];
     if (f.budget.forecastVsBudget !== null && f.budget.forecastVsBudget > (p.budgetCost ?? 0) * 0.05) {
-      add({ id: `att_budget_${p.id}`, kind: "margin", title: `${p.name} forecast over budget`, why: `Forecast cost exceeds the approved budget by ${Math.round(f.budget.forecastVsBudget).toLocaleString()}.`, next: "Decide whether to fund the overrun, descope, or re-phase.", severity: "medium", impactValue: f.budget.forecastVsBudget, impactLabel: "Forecast overrun", ownerId: p.ownerId, dueDate: addDays(asOf, 10), accountId: p.accountId, projectId: p.id, links: [{ type: "project", id: p.id }, { type: "calculation", id: `margin:${p.id}` }] });
+      add({ id: `att_budget_${p.id}`, kind: "margin", title: `${p.name} forecast over budget`, why: `Forecast cost exceeds the approved budget by ${fmtMoney(f.budget.forecastVsBudget, ds.org.reportingCurrency, { compact: true })}.`, next: "Decide whether to fund the overrun, descope, or re-phase.", severity: "medium", impactValue: f.budget.forecastVsBudget, impactLabel: "Forecast overrun", ownerId: p.ownerId, dueDate: addDays(asOf, 10), accountId: p.accountId, projectId: p.id, links: [{ type: "project", id: p.id }, { type: "calculation", id: `margin:${p.id}` }] });
     }
   }
 
@@ -202,7 +203,7 @@ export function computeAnalysis(ds: Dataset, overlay: OrgOverlay | null, periodK
 
   for (const s of ar.overdue) {
     if (s.daysOverdue < 10) continue;
-    add({ id: `att_inv_${s.invoice.id}`, kind: "invoice", title: `Invoice ${s.invoice.number} (${idx.account.get(s.invoice.accountId)?.name}) is ${s.daysOverdue} days overdue`, why: `Outstanding ${Math.round(s.outstanding).toLocaleString()} since ${fmtDate(s.invoice.dueDate)}.`, next: s.daysOverdue > 60 ? "Escalate collection and confirm a payment date; excluded from the base-case cash forecast." : "Chase payment and confirm a date.", severity: s.daysOverdue > 60 ? "high" : "medium", impactValue: s.outstanding, impactLabel: "Cash outstanding", ownerId: ds.org.demoPersonas.finance, dueDate: addDays(asOf, 2), accountId: s.invoice.accountId, links: [{ type: "invoice", id: s.invoice.id }, { type: "account", id: s.invoice.accountId }] });
+    add({ id: `att_inv_${s.invoice.id}`, kind: "invoice", title: `Invoice ${s.invoice.number} (${idx.account.get(s.invoice.accountId)?.name}) is ${s.daysOverdue} days overdue`, why: `${fmtMoney(s.outstanding, ds.org.reportingCurrency)} outstanding since ${fmtDate(s.invoice.dueDate)}.`, next: s.daysOverdue > 60 ? "Escalate collection and confirm a payment date; excluded from the base-case cash forecast." : "Chase payment and confirm a date.", severity: s.daysOverdue > 60 ? "high" : "medium", impactValue: s.outstanding, impactLabel: "Cash outstanding", ownerId: ds.org.demoPersonas.finance, dueDate: addDays(asOf, 2), accountId: s.invoice.accountId, links: [{ type: "invoice", id: s.invoice.id }, { type: "account", id: s.invoice.accountId }] });
   }
 
   for (const pc of capacity.overallocated) {

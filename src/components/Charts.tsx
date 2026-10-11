@@ -60,7 +60,7 @@ export function RevenueChart({ data, symbol, title, stacked = false }: { data: M
               <LineChart data={margins} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                 <CartesianGrid stroke={C.grid} vertical={false} />
                 <XAxis dataKey="label" {...AXIS} tickFormatter={(v: string) => v.slice(0, 3)} />
-                <YAxis {...AXIS} tickFormatter={(v: number) => `${v}%`} width={44} domain={[0, 100]} />
+                <YAxis {...AXIS} tickFormatter={(v: number) => `${v}%`} width={52} domain={[0, 100]} />
                 <Tooltip {...TOOLTIP} cursor={{ stroke: C.muted, strokeDasharray: "3 3" }} formatter={(v) => [`${v}%`, "Delivery margin"]} />
                 <Line dataKey="marginPct" name="Delivery margin" stroke={C.ink} strokeWidth={2} dot={{ r: 4, fill: "#fff", strokeWidth: 2 }} activeDot={{ r: 5 }} connectNulls={false} />
               </LineChart>

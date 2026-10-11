@@ -9,7 +9,7 @@ const config: Config = {
         mono: ["var(--font-geist-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
-        ink: { DEFAULT: "#0e1015", soft: "#454a57", muted: "#7c8190", faint: "#a6aab5" },
+        ink: { DEFAULT: "#0e1015", soft: "#454a57", muted: "#5d6271", faint: "#737885" },
         canvas: "#f5f5f7",
         surface: "#ffffff",
         line: { DEFAULT: "#e7e7ec", strong: "#d6d7de" },

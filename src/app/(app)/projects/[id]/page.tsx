@@ -1,20 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { peopleOptions } from "@/components/blocks";
+import { SignalRow, peopleOptions } from "@/components/blocks";
+import { ChangeRow } from "@/components/weekly";
+import { AskAssistantButton, AssistantScope } from "@/components/Assistant";
 import { ActionForm } from "@/components/forms";
 import { ScenarioCalculator } from "@/components/ScenarioCalculator";
-import { Badge, Card, DefList, KindTag, MilestoneBadge, Notice, PageHeader, Restricted, SeverityBadge, SourceTag, Stat, CardLink } from "@/components/ui";
+import { IssueCard } from "@/components/issues";
+import { StatusPanel } from "@/components/status";
+import { Badge, Card, DefList, EmptyState, MilestoneBadge, Notice, PageHeader, Restricted, SeverityBadge, SourceTag, Stat, Tabs, CardLink } from "@/components/ui";
+import { interpretProject } from "@/lib/interpret";
+import { buildIssues } from "@/lib/issues";
 import { scenarioBaseFor } from "@/data/scenario-base";
 import { getWorkspace } from "@/data/session";
 import { addDays, fmtDate, fmtMonth, relativeDays } from "@/lib/dates";
 import { plannedHoursBetween } from "@/lib/calc/finance";
-import { fmtHours, fmtPct } from "@/lib/money";
+import { fmtHours, fmtPct, fmtPts } from "@/lib/money";
 import { viewHelpers } from "@/lib/view";
 
 const BILLING_LABEL: Record<string, string> = { fixed_fee: "Fixed fee", retainer: "Retainer", time_materials: "Time & materials", internal: "Internal initiative" };
 
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; explore?: string }> }) {
   const { id } = await params;
+  const sp = await searchParams;
   const ws = await getWorkspace();
   const p = ws.data.projects.find((x) => x.id === id);
   if (!p) notFound();
@@ -40,6 +47,27 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   }
   const internal = p.billing === "internal";
   const showMoney = ws.caps.viewProjectCosts && !!f;
+  const issues = buildIssues(ws);
+  const titles = Object.fromEntries(issues.map((i) => [i.id, i.title]));
+  const mine = issues.filter((i) => i.projectIds.includes(p.id) || i.parts.some((x) => x.links.some((l) => l.type === "project" && l.id === p.id)));
+  const [key, ...others] = mine;
+  const it = interpretProject(ws, p.id, issues);
+  // Blockers come before any calculation: blocked or late milestones and blocked tasks, with who owns the next step.
+  const blockers = [
+    ...milestones.filter((m) => ["blocked", "late", "awaiting_client"].includes(a.milestones[m.id].state)).map((m) => ({ id: m.id, name: m.name, state: a.milestones[m.id].state === "awaiting_client" ? "Waiting on approval" : a.milestones[m.id].state === "late" ? "Late" : "Blocked", tone: (a.milestones[m.id].state === "awaiting_client" ? "warn" : "bad") as "warn" | "bad", reason: m.blockedReason ?? `Due ${fmtDate(a.milestones[m.id].due)}`, ownerId: m.ownerId })),
+    ...tasks.filter((x) => x.status === "blocked").map((x) => ({ id: x.id, name: x.title, state: "Blocked task", tone: "bad" as const, reason: x.blockerNote ?? "Blocked", ownerId: x.assigneeId ?? p.ownerId })),
+  ];
+  const projectSignals = a.signals.filter((x) => x.projectId === p.id && x.polarity === "risk" && !x.autoResolved && x.review.status !== "dismissed");
+  const changes = ws.changes.items.filter((c) => c.projectId === p.id || c.links.some((l) => milestones.some((m) => m.id === l.id)));
+  const tabs = [
+    { key: "overview", label: "Overview" },
+    { key: "delivery", label: "Delivery", count: blockers.length },
+    ...(ws.caps.viewProjectCosts && f ? [{ key: "financials", label: internal ? "Budget" : "Financials" }] : []),
+    { key: "team", label: "Team" },
+    { key: "evidence", label: "Evidence", count: projectSignals.length },
+  ];
+  const tab = tabs.some((x) => x.key === sp.tab) ? sp.tab! : "overview";
+  const exploreOpen = sp.explore === "1";
 
   return (
     <div className="space-y-6">
@@ -56,14 +84,165 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             <Badge>{p.status.replace("_", " ")}</Badge>
             {p.accountId && <Link href={`/accounts/${p.accountId}`}>{v.account(p.accountId)}</Link>}
             <span>
-              · Owner {v.person(p.ownerId)} · {fmtDate(p.startDate)} – {fmtDate(p.currentEndDate, { year: true })}
+              Owner {v.person(p.ownerId)} · {fmtDate(p.startDate)} – {fmtDate(p.currentEndDate, { year: true })}
               {p.currentEndDate !== p.originalEndDate && <span className="text-warn"> (originally {fmtDate(p.originalEndDate)})</span>}
             </span>
           </span>
         }
+        actions={<AskAssistantButton label={`Ask about this ${t.project.toLowerCase()}`} />}
       />
-      <p className="max-w-3xl text-sm text-ink-soft">{p.description}</p>
+      <AssistantScope kind="project" id={p.id} label={`This ${t.project.toLowerCase()}`} name={p.name} suggestions={[`What is the current status of ${p.name}?`, `What is blocking ${p.name}?`, ...(ws.caps.viewProjectCosts ? [`Why is ${p.name} forecast at this margin?`] : []), "Who is overloaded right now?"]} />
+      <Tabs base={`/projects/${p.id}`} tabs={tabs} current={tab} />
 
+      {tab === "overview" && (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-6">
+            <p className="max-w-3xl text-sm text-ink-soft">{p.description}</p>
+            <StatusPanel it={it} />
+            {blockers.length > 0 && (
+              <Card title="Blockers" subtitle="What is stopping progress, and who owns the next step">
+                <ul className="space-y-2.5 text-sm">
+                  {blockers.map((b) => (
+                    <li key={b.id}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone={b.tone} icon="■">{b.state}</Badge>
+                        <Link href={`#${b.id}`} className="font-medium">{b.name}</Link>
+                      </div>
+                      <div className="mt-0.5 text-ink-soft">{b.reason}</div>
+                      <div className="text-xs text-ink-muted">Next step owner: {v.person(b.ownerId)}</div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+            <section aria-labelledby="key-issue" className="space-y-3">
+              <h2 id="key-issue" className="text-lg font-semibold tracking-tight">{key ? "Key issue" : "Issues"}</h2>
+              {key ? <IssueCard ws={ws} issue={key} titles={titles} /> : <EmptyState title={`Nothing needs attention on this ${t.project.toLowerCase()}`} />}
+              {others.length > 0 && (
+                <ul className="space-y-1 text-sm">
+                  {others.map((i) => (
+                    <li key={i.id}>
+                      Also: <Link href={`/issues#${i.id}`}>{i.title}</Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+          <div className="space-y-6">
+        <Card title="Plans">
+          {actions.length > 0 && (
+            <ul className="mb-3 space-y-1.5 text-sm">
+              {actions.map((x) => (
+                <li key={x.id} className="flex items-center gap-2">
+                  <SeverityBadge severity={x.severity} />
+                  <Link href={`/actions#${x.id}`}>{x.title}</Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <ActionForm label="Create plan" people={peopleOptions(ws)} canManage={ws.caps.manageActions} minDate={ws.org.demoDate} defaults={{ ownerId: p.ownerId, dueDate: addDays(ws.org.demoDate, 7), accountId: p.accountId, links: [{ type: "project", id: p.id }] }} />
+        </Card>
+          </div>
+        </div>
+      )}
+
+      {tab === "delivery" && (
+        <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card title="Milestones" padded={false}>
+          {milestones.length === 0 ? (
+            <p className="p-4 text-sm text-ink-muted">No milestones.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {milestones.map((m) => {
+                const st = a.milestones[m.id];
+                return (
+                  <li key={m.id} id={m.id} className="scroll-mt-20 p-4 target:bg-accent-soft">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">{m.name}</span>
+                      <MilestoneBadge state={st.state} />
+                    </div>
+                    <div className="mt-0.5 text-xs text-ink-muted">
+                      {m.completedOn ? `Completed ${fmtDate(m.completedOn)}` : `Due ${fmtDate(st.due)} (${relativeDays(ws.org.demoDate, st.due)})`} · owner {v.person(m.ownerId)}
+                      {m.billingAmount && ws.caps.viewProjectCosts ? ` · billing ${v.money(m.billingAmount)}` : ""}
+                    </div>
+                    {m.blockedReason && <p className="mt-1 text-sm text-bad">{m.blockedReason}</p>}
+                    {m.awaitingClientSince && !m.completedOn && <p className="mt-0.5 text-xs text-warn">Waiting since {fmtDate(m.awaitingClientSince)} ({relativeDays(ws.org.demoDate, m.awaitingClientSince)})</p>}
+                    {m.dueChanges.length > 0 && (
+                      <ul className="mt-1 space-y-0.5 text-xs text-ink-soft">
+                        <li>Originally due {fmtDate(m.originalDue)}</li>
+                        {m.dueChanges.map((c) => (
+                          <li key={c.changedOn + c.newDue}>
+                            {fmtDate(c.changedOn)}: moved to {fmtDate(c.newDue)}. {c.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="Tasks" padded={false} subtitle="Synced from project management (simulated)">
+          {tasks.length === 0 ? (
+            <p className="p-4 text-sm text-ink-muted">No tasks.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {tasks.map((x) => {
+                const overdue = x.status !== "done" && x.due < ws.org.demoDate;
+                return (
+                  <li key={x.id} id={x.id} className="scroll-mt-20 px-4 py-3 target:bg-accent-soft">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm">{x.title}</span>
+                      <Badge tone={x.status === "done" ? "good" : x.status === "blocked" ? "bad" : overdue ? "warn" : "neutral"}>{x.status === "in_progress" ? "In progress" : x.status === "todo" ? (overdue ? "Overdue" : "To do") : x.status.charAt(0).toUpperCase() + x.status.slice(1)}</Badge>
+                    </div>
+                    <div className="mt-0.5 text-xs text-ink-muted">
+                      {x.assigneeId ? <Link href={`/team#${x.assigneeId}`}>{v.person(x.assigneeId)}</Link> : <span className="text-warn">Unassigned</span>} · due {fmtDate(x.due)} · {x.estimateHours} h est.
+                      {x.dependsOn.length > 0 && <> · depends on {x.dependsOn.map((d) => tasks.find((y) => y.id === d)?.title ?? d).join(", ")}</>}
+                    </div>
+                    {x.blockerNote && <p className="mt-1 text-xs text-bad">Blocker: {x.blockerNote}</p>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+        <Card title="Dependencies and scope changes">
+          {deps.length === 0 && dependents.length === 0 ? (
+            <p className="text-sm text-ink-muted">No cross-project dependencies.</p>
+          ) : (
+            <DefList
+              items={[
+                ...deps.map((d) => ["Depends on", ws.data.projects.some((x) => x.id === d!.id) ? <Link key={d!.id} href={`/projects/${d!.id}`}>{d!.name}</Link> : d!.name] as [string, React.ReactNode]),
+                ...dependents.map((d) => ["Blocks", <Link key={d.id} href={`/projects/${d.id}`}>{d.name}</Link>] as [string, React.ReactNode]),
+              ]}
+            />
+          )}
+          {p.scopeChanges.length > 0 && (
+            <div className="mt-4 border-t border-line pt-3">
+              <div className="mb-1 text-sm font-medium">Scope changes</div>
+              <ul className="space-y-1 text-xs">
+                {p.scopeChanges.map((s) => (
+                  <li key={s.id}>
+                    {fmtDate(s.date)}: {s.description} ({s.hours} h, {s.billable ? (s.approved ? "billable, approved" : "billable, pending approval") : "non-billable"}
+                    {s.amount && ws.caps.viewProjectCosts ? `, ${v.money(s.amount)}` : ""})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+
+        </div>
+      )}
+
+      {tab === "financials" && (
+        <div className="space-y-6">
       {f && (f.missing.length > 0 || f.notes.length > 0) && (
         <div className="space-y-2">
           {f.missing.length > 0 && (
@@ -97,11 +276,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </>
           ) : (
             <>
-              <Stat label="Revenue at completion" value={v.money(f.revenue.atCompletion, { compact: true })} kind="calculated" href="#calculation" />
-              <Stat label="Earned to date" value={v.money(f.revenue.earnedToDate, { compact: true })} sub={`Since ${fmtDate(f.measurementStart)}`} kind="calculated" />
+              <Stat label="Revenue at completion" value={v.money(f.revenue.atCompletion, { compact: true })} sub="Forecast" kind="calculated" href="#calculation" />
+              <Stat label="Earned to date" value={v.money(f.revenue.earnedToDate, { compact: true })} sub={`To date, since ${fmtDate(f.measurementStart)}`} kind="calculated" />
               <Stat label="Invoiced / collected" value={v.money(f.revenue.invoicedToDate, { compact: true })} sub={`${v.money(f.revenue.collectedToDate, { compact: true })} collected`} kind="observed" />
-              <Stat label="Margin to date" value={fmtPct(f.margin.actualToDate)} sub={`${v.money(f.margin.profitToDate, { compact: true })} profit`} kind="calculated" />
-              <Stat label="Forecast margin" value={fmtPct(f.margin.forecastAtCompletion)} sub={`Target ${fmtPct(f.margin.target)} · ${fmtPct(f.margin.variance, 0, { sign: true })}`} tone={f.margin.variance !== null && f.margin.variance < -0.05 ? "bad" : f.margin.variance !== null && f.margin.variance >= 0 ? "good" : "warn"} kind="calculated" href="#calculation" />
+              <Stat label="Margin to date" value={fmtPct(f.margin.actualToDate)} sub={`To date · ${v.money(f.margin.profitToDate, { compact: true })} profit`} kind="calculated" />
+              <Stat label="Forecast margin" value={fmtPct(f.margin.forecastAtCompletion)} sub={`Forecast · target ${fmtPct(f.margin.target)} · ${fmtPts(f.margin.variance)}`} tone={f.margin.variance !== null && f.margin.variance < -0.05 ? "bad" : f.margin.variance !== null && f.margin.variance >= 0 ? "good" : "warn"} kind="calculated" href="#calculation" />
             </>
           )}
           <Stat label="Hours: actual vs planned" value={fmtHours(f.hours.actual)} sub={`${fmtHours(plannedHoursBetween(p, f.measurementStart, ws.org.demoDate))} planned to date · ${fmtHours(f.hours.remaining)} remaining · budget ${fmtHours(f.hours.budget)}`} tone={f.hours.atCompletion > f.hours.budget ? "warn" : undefined} kind="observed" />
@@ -199,75 +378,47 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       )}
 
       {showMoney && base && (
-        <Card id="scenario" title="What-if calculator" subtitle="Test price, scope and staffing changes. Uses project-level aggregates only.">
+        <details id="scenario" className="card group p-5" open={exploreOpen}>
+          <summary className="cursor-pointer select-none text-[15px] font-semibold">
+            Explore options <span className="text-sm font-normal text-ink-muted">· test price, scope and staffing changes; nothing changes unless someone with permission applies it</span>
+          </summary>
+          <div className="mt-4">
           <ScenarioCalculator projectId={p.id} base={base} currency={ws.org.reportingCurrency} canApply={ws.caps.applyScenarios} applied={adj ? { note: adj.note, at: adj.appliedAt, by: v.person(adj.appliedBy) } : null} />
-        </Card>
+          </div>
+        </details>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Milestones" padded={false}>
-          {milestones.length === 0 ? (
-            <p className="p-4 text-sm text-ink-muted">No milestones.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {milestones.map((m) => {
-                const st = a.milestones[m.id];
-                return (
-                  <li key={m.id} id={m.id} className="scroll-mt-20 p-4 target:bg-accent-soft">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-medium">{m.name}</span>
-                      <MilestoneBadge state={st.state} />
-                    </div>
-                    <div className="mt-0.5 text-xs text-ink-muted">
-                      {m.completedOn ? `Completed ${fmtDate(m.completedOn)}` : `Due ${fmtDate(st.due)} (${relativeDays(ws.org.demoDate, st.due)})`} · owner {v.person(m.ownerId)}
-                      {m.billingAmount && ws.caps.viewProjectCosts ? ` · billing ${v.money(m.billingAmount)}` : ""}
-                    </div>
-                    {m.blockedReason && <p className="mt-1 text-sm text-bad">{m.blockedReason}</p>}
-                    {m.awaitingClientSince && !m.completedOn && <p className="mt-0.5 text-xs text-warn">Waiting since {fmtDate(m.awaitingClientSince)} ({relativeDays(ws.org.demoDate, m.awaitingClientSince)})</p>}
-                    {m.dueChanges.length > 0 && (
-                      <ul className="mt-1 space-y-0.5 text-xs text-ink-soft">
-                        <li>Originally due {fmtDate(m.originalDue)}</li>
-                        {m.dueChanges.map((c) => (
-                          <li key={c.changedOn + c.newDue}>
-                            {fmtDate(c.changedOn)}: moved to {fmtDate(c.newDue)}. {c.reason}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
+        </div>
+      )}
 
-        <Card title="Tasks" padded={false} subtitle="Synced from project management (simulated)">
-          {tasks.length === 0 ? (
-            <p className="p-4 text-sm text-ink-muted">No tasks.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {tasks.map((x) => {
-                const overdue = x.status !== "done" && x.due < ws.org.demoDate;
-                return (
-                  <li key={x.id} id={x.id} className="scroll-mt-20 px-4 py-3 target:bg-accent-soft">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm">{x.title}</span>
-                      <Badge tone={x.status === "done" ? "good" : x.status === "blocked" ? "bad" : overdue ? "warn" : "neutral"}>{x.status === "in_progress" ? "In progress" : x.status === "todo" ? (overdue ? "Overdue" : "To do") : x.status.charAt(0).toUpperCase() + x.status.slice(1)}</Badge>
-                    </div>
-                    <div className="mt-0.5 text-xs text-ink-muted">
-                      {x.assigneeId ? <Link href={`/team#${x.assigneeId}`}>{v.person(x.assigneeId)}</Link> : <span className="text-warn">Unassigned</span>} · due {fmtDate(x.due)} · {x.estimateHours} h est.
-                      {x.dependsOn.length > 0 && <> · depends on {x.dependsOn.map((d) => tasks.find((y) => y.id === d)?.title ?? d).join(", ")}</>}
-                    </div>
-                    {x.blockerNote && <p className="mt-1 text-xs text-bad">Blocker: {x.blockerNote}</p>}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-      </div>
+      {tab === "evidence" && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card title="Signals from conversations" subtitle="Inferred; confidence describes evidence strength">
+            {projectSignals.length === 0 ? <p className="text-sm text-ink-muted">No open signals tied to this {t.project.toLowerCase()}.</p> : <ul className="divide-y divide-line">{projectSignals.map((x) => <SignalRow key={x.id} ws={ws} s={x} />)}</ul>}
+          </Card>
+          <div className="space-y-6">
+            <Card title="Changes in the last 7 days">
+              {changes.length === 0 ? <p className="text-sm text-ink-muted">No changes.</p> : <ul className="space-y-3">{changes.map((c, n) => <ChangeRow key={n} ws={ws} c={c} />)}</ul>}
+            </Card>
+            <Card title="Conversations" subtitle="Simulated, from authorized mailboxes and channels only">
+              {threads.length === 0 ? (
+                <p className="text-sm text-ink-muted">None visible to your role.</p>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {threads.map((th) => (
+                    <li key={th.id}>
+                      <Link href={`/communications/${th.id}`}>{th.subject}</Link> <span className="text-xs text-ink-muted">· {th.messages.length} messages</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        </div>
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      {tab === "team" && (
+        <div className="max-w-3xl">
         <Card title="Team and planned hours">
           <table className="w-full">
             <thead>
@@ -301,62 +452,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <p className="mt-2 text-[11px] text-ink-muted">Individual cost rates are not shown here. They derive from restricted compensation data.</p>
         </Card>
 
-        <Card title="Dependencies">
-          {deps.length === 0 && dependents.length === 0 ? (
-            <p className="text-sm text-ink-muted">No cross-project dependencies.</p>
-          ) : (
-            <DefList
-              items={[
-                ...deps.map((d) => ["Depends on", ws.data.projects.some((x) => x.id === d!.id) ? <Link key={d!.id} href={`/projects/${d!.id}`}>{d!.name}</Link> : d!.name] as [string, React.ReactNode]),
-                ...dependents.map((d) => ["Blocks", <Link key={d.id} href={`/projects/${d.id}`}>{d.name}</Link>] as [string, React.ReactNode]),
-              ]}
-            />
-          )}
-          {p.scopeChanges.length > 0 && (
-            <div className="mt-4 border-t border-line pt-3">
-              <div className="mb-1 text-sm font-medium">Scope changes</div>
-              <ul className="space-y-1 text-xs">
-                {p.scopeChanges.map((s) => (
-                  <li key={s.id}>
-                    {fmtDate(s.date)}: {s.description} ({s.hours} h, {s.billable ? (s.approved ? "billable, approved" : "billable, pending approval") : "non-billable"}
-                    {s.amount && ws.caps.viewProjectCosts ? `, ${v.money(s.amount)}` : ""})
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </Card>
-
-        <Card title="Actions and communications">
-          {actions.length > 0 && (
-            <ul className="mb-3 space-y-1.5 text-sm">
-              {actions.map((x) => (
-                <li key={x.id} className="flex items-center gap-2">
-                  <SeverityBadge severity={x.severity} />
-                  <Link href={`/actions#${x.id}`}>{x.title}</Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <ActionForm people={peopleOptions(ws)} canManage={ws.caps.manageActions} minDate={ws.org.demoDate} defaults={{ ownerId: p.ownerId, dueDate: addDays(ws.org.demoDate, 7), accountId: p.accountId, links: [{ type: "project", id: p.id }] }} />
-          <div className="mt-4 border-t border-line pt-3">
-            <div className="mb-1 flex items-center gap-2 text-sm font-medium">
-              Threads <KindTag kind="observed" />
-            </div>
-            {threads.length === 0 ? (
-              <p className="text-xs text-ink-muted">None visible to your role.</p>
-            ) : (
-              <ul className="space-y-1 text-sm">
-                {threads.map((th) => (
-                  <li key={th.id}>
-                    <Link href={`/communications/${th.id}`}>{th.subject}</Link> <span className="text-xs text-ink-muted">· {th.messages.length} msgs</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </Card>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

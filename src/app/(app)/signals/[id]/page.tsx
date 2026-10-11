@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { peopleOptions } from "@/components/blocks";
+import { SignalReviewBadge, peopleOptions } from "@/components/blocks";
 import { ActionForm, SignalReviewControls } from "@/components/forms";
-import { Badge, Card, ConfidenceBadge, DefList, KindTag, Notice, PageHeader, ReviewBadge, SeverityBadge } from "@/components/ui";
+import { Badge, Card, ConfidenceBadge, DefList, KindTag, Notice, PageHeader, SeverityBadge } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
 import type { Evidence } from "@/domain/types";
 import { addDays, fmtDate } from "@/lib/dates";
@@ -54,13 +54,17 @@ export default async function SignalPage({ params }: { params: Promise<{ id: str
           <span className="flex flex-wrap items-center gap-2">
             <SeverityBadge severity={sev} />
             <ConfidenceBadge confidence={s.confidence} reason={s.confidenceReason} />
-            <ReviewBadge status={s.review.status} />
+            <SignalReviewBadge s={s} />
             <KindTag kind="inferred" />
-            {s.autoResolved && <Badge tone="good">Resolved later in the thread</Badge>}
           </span>
         }
       />
-      {s.newEvidenceSinceReview && <Notice title="New evidence since this was dismissed">{s.review.note}</Notice>}
+      {s.newEvidenceSinceReview && (
+        <Notice title={`Reopened: new evidence on ${fmtDate(s.lastEvidenceOn)}`}>
+          {s.review.note} The latest message: “{s.evidence[0]?.excerpt}”
+        </Notice>
+      )}
+      {s.autoResolved && s.review.status === "unreviewed" && <Notice tone="info" title="Appears resolved · awaiting confirmation">Later messages in the same thread suggest this was resolved. Confirm it below to close it, or dismiss it if it was never an issue.</Notice>}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
@@ -76,9 +80,14 @@ export default async function SignalPage({ params }: { params: Promise<{ id: str
           <Card title={`Supporting evidence (${s.evidence.length})`}>
             <EvidenceList items={s.evidence} empty="No supporting messages." />
           </Card>
-          <Card title={`Contradicting evidence (${s.counterEvidence.length})`} subtitle="Messages that point the other way are kept, not hidden">
-            <EvidenceList items={s.counterEvidence} empty="No contradicting messages found." />
+          <Card title={`Contradicting evidence (${s.counterEvidence.filter((e) => e.relation !== "context").length})`} subtitle="Later messages in the same conversation, or directly opposite statements. Newer ones lower confidence.">
+            <EvidenceList items={s.counterEvidence.filter((e) => e.relation !== "context")} empty="No contradicting messages found." />
           </Card>
+          {s.counterEvidence.some((e) => e.relation === "context") && (
+            <Card title="Context from other conversations" subtitle="Opposite-tone remarks about other topics, such as praise for one deliverable. Kept for balance; they do not lower confidence.">
+              <EvidenceList items={s.counterEvidence.filter((e) => e.relation === "context")} empty="" />
+            </Card>
+          )}
           {s.resolutionEvidence.length > 0 && (
             <Card title="Resolution evidence" subtitle="Later messages indicating the issue was resolved">
               <EvidenceList items={s.resolutionEvidence} empty="" />
@@ -102,7 +111,7 @@ export default async function SignalPage({ params }: { params: Promise<{ id: str
           <Card title="Review">
             <SignalReviewControls signalId={s.id} status={s.review.status} canReview={ws.caps.reviewSignals} />
           </Card>
-          <Card title="Actions">
+          <Card title="Plans">
             {existing.length > 0 && (
               <ul className="mb-3 space-y-1 text-sm">
                 {existing.map((a) => (

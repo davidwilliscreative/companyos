@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Badge, Card, KindTag, Notice, PageHeader, Stat } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
 import { assessNewWork, isDeliveryRole } from "@/lib/calc/capacity";
-import { billRateOn } from "@/lib/calc/finance";
 import { addDays, fmtDate, mondayOf } from "@/lib/dates";
 import { fmtHours, fmtPct } from "@/lib/money";
 import { viewHelpers } from "@/lib/view";
@@ -38,19 +37,73 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Team and capacity" subtitle={`${a.period.label} for actuals; next 8 weeks for planned load. Capacity = contracted hours × FTE − approved time off.`} />
+      <PageHeader eyebrow="Delivery" title="Capacity" subtitle={`${a.period.label} for actuals; next 8 weeks for planned load. Capacity = contracted hours × FTE − approved time off.`} />
       {!ws.caps.allAccounts && <Notice tone="info">Projects outside your accounts are shown as “Other work” so that you can see load without seeing other clients.</Notice>}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {billable && <Stat label="Billable utilization (delivery employees)" value={fmtPct(cap.team.utilization)} sub={`${fmtHours(cap.team.billable)} billable of ${fmtHours(cap.team.available)} available · target ${fmtPct(ws.org.billableUtilizationTarget ?? null)}`} kind="calculated" href="/calculations#utilization" />}
+        {billable && (
+          <Stat
+            label="Billable utilization (delivery employees)"
+            value={fmtPct(cap.team.utilization)}
+            sub={`${fmtHours(cap.team.billable)} billable of ${fmtHours(cap.team.available)} available · target ${fmtPct(ws.org.billableUtilizationTarget ?? null)}`}
+            kind="calculated"
+            href="/calculations#utilization"
+          />
+        )}
         <Stat label="Over-allocated" value={cap.overallocated.length} sub="Above 105% in 2+ of next 4 weeks" tone={cap.overallocated.length ? "bad" : undefined} kind="calculated" />
-        <Stat label="Unstaffed remaining effort" value={fmtHours(cap.gaps.reduce((s, g) => s + g.hours, 0))} sub={`${cap.gaps.length} ${ws.profile.terms.projects.toLowerCase()}`} tone={cap.gaps.length ? "warn" : undefined} kind="calculated" />
+        <Stat
+          label="Unstaffed remaining effort"
+          value={fmtHours(cap.gaps.reduce((s, g) => s + g.hours, 0))}
+          sub={`${cap.gaps.length} ${ws.profile.terms.projects.toLowerCase()}`}
+          tone={cap.gaps.length ? "warn" : undefined}
+          kind="calculated"
+        />
         <Stat label="Missing timesheets" value={cap.missingTimesheets.length} sub="People planned on work with weeks of no time recorded" tone={cap.missingTimesheets.length ? "warn" : undefined} kind="observed" />
       </div>
 
-      <Card id="utilization" title="People" padded={false} subtitle={ws.personCosts ? "Compensation-derived cost columns are visible because your role is authorized." : "Compensation is restricted for your role and was not loaded."}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px]">
+      <Card
+        id="utilization"
+        title="People"
+        padded={false}
+        subtitle={
+          ws.caps.viewProjectCosts ? (
+            <>
+              Hours and planned load only. Bill rates and cost rates are under <Link href="/team/rates">Rates and costs</Link>.
+            </>
+          ) : (
+            "Hours and planned load only."
+          )
+        }
+      >
+        {/* Phones: one row per person with the next four weeks of planned load. */}
+        <ul className="divide-y divide-line md:hidden">
+          {people.map((pc) => {
+            const over = cap.overallocated.some((o) => o.person.id === pc.person.id);
+            return (
+              <li key={pc.person.id} className="px-4 py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-medium">{pc.person.name}</span>
+                  {over && <span className="text-xs font-medium text-bad">! Over capacity</span>}
+                </div>
+                <div className="text-xs text-ink-muted">
+                  {pc.person.title}
+                  {pc.person.fte < 1 && ` · ${pc.person.fte} FTE`}
+                  {billable && pc.delivery && ` · ${fmtPct(pc.period.utilization)} billable`}
+                </div>
+                <div className="mt-2 grid grid-cols-4 gap-1">
+                  {pc.upcoming.weeks.slice(0, 4).map((w) => (
+                    <div key={w.week} className={`rounded-md px-1 py-1 text-center text-[11px] font-medium tabular-nums ${Number.isFinite(w.pct) ? heat(w.pct) : w.planned > 0 ? "bg-bad text-white" : "bg-canvas text-ink-faint"}`}>
+                      <div className="text-[10px] font-normal opacity-80">{fmtDate(w.week)}</div>
+                      {!Number.isFinite(w.pct) ? (w.planned > 0 ? "Off!" : "Off") : `${Math.round(w.pct * 100)}%`}
+                    </div>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[860px]">
             <thead>
               <tr>
                 <th className="th">Person</th>
@@ -59,9 +112,6 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
                 <th className="th num">Logged</th>
                 {billable && <th className="th num">Billable</th>}
                 {billable && <th className="th num">Utilization</th>}
-                {ws.caps.viewProjectCosts && <th className="th num">Bill rate</th>}
-                {ws.personCosts && <th className="th num">Cost / hour</th>}
-                {ws.personCosts && <th className="th num">Annual loaded</th>}
                 {weekHeaders.map((w) => (
                   <th key={w} className="th num whitespace-nowrap px-1 text-[10px]">
                     {fmtDate(w)}
@@ -71,7 +121,6 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
             </thead>
             <tbody>
               {people.map((pc) => {
-                const cost = ws.personCosts?.[pc.person.id];
                 const missing = cap.missingTimesheets.find((m) => m.personId === pc.person.id);
                 return (
                   <tr key={pc.person.id} id={pc.person.id} className="scroll-mt-20 target:bg-accent-soft">
@@ -89,20 +138,12 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
                     <td className="td num">{fmtHours(pc.period.actual)}</td>
                     {billable && <td className="td num">{fmtHours(pc.period.billable)}</td>}
                     {billable && <td className="td num">{pc.delivery ? fmtPct(pc.period.utilization) : <span className="text-xs text-ink-muted">n/a</span>}</td>}
-                    {ws.caps.viewProjectCosts && (
-                      <td className="td num">
-                        {(() => {
-                          const r = billRateOn(ws.data, pc.person.id, ws.org.demoDate);
-                          const eff = ws.data.billRates.filter((b) => b.personId === pc.person.id && b.effectiveFrom <= ws.org.demoDate).sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? 1 : -1))[0];
-                          return r === null ? <span className="text-xs text-ink-muted">—</span> : <>{v.money(r)}<div className="text-[10px] text-ink-muted">from {fmtDate(eff?.effectiveFrom)}</div></>;
-                        })()}
-                      </td>
-                    )}
-                    {ws.personCosts && <td className="td num">{cost?.hourlyCost !== null && cost?.hourlyCost !== undefined ? <>{v.money(cost.hourlyCost)}{cost.effectiveFrom && <div className="text-[10px] text-ink-muted">from {fmtDate(cost.effectiveFrom)}</div>}</> : <span className="text-xs text-warn">missing</span>}</td>}
-                    {ws.personCosts && <td className="td num">{cost?.annualLoaded !== null && cost?.annualLoaded !== undefined ? v.money(cost.annualLoaded, { compact: true }) : <span className="text-xs text-ink-muted">{pc.person.type === "contractor" ? "—" : "missing"}</span>}</td>}
                     {pc.upcoming.weeks.map((w) => (
                       <td key={w.week} className="border-b border-line px-0.5 py-1">
-                        <div className={`rounded-md px-1 py-1 text-center text-[10px] font-medium tabular-nums ${Number.isFinite(w.pct) ? heat(w.pct) : w.planned > 0 ? "bg-bad text-white" : "bg-canvas text-ink-faint"}`} title={Number.isFinite(w.pct) ? `${w.planned} h planned (${Math.round(w.pct * 100)}%)` : `${w.planned} h planned while on approved time off`}>
+                        <div
+                          className={`rounded-md px-1 py-1 text-center text-[10px] font-medium tabular-nums ${Number.isFinite(w.pct) ? heat(w.pct) : w.planned > 0 ? "bg-bad text-white" : "bg-canvas text-ink-faint"}`}
+                          title={Number.isFinite(w.pct) ? `${w.planned} h planned (${Math.round(w.pct * 100)}%)` : `${w.planned} h planned while on approved time off`}
+                        >
                           {!Number.isFinite(w.pct) ? (w.planned > 0 ? "Off!" : "Off") : w.pct ? `${Math.round(w.pct * 100)}` : "·"}
                         </div>
                       </td>
@@ -113,7 +154,9 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
             </tbody>
           </table>
         </div>
-        <p className="px-5 py-3 text-xs text-ink-muted">Weekly cells show planned hours as % of capacity. Red = over 105%. “Off” = approved time off; “Off!” = work planned during time off. Planned load comes from assignments; actual load comes from timesheets.</p>
+        <p className="px-5 py-3 text-xs text-ink-muted">
+          Weekly cells show planned hours as % of capacity. Red = over 105%. “Off” = approved time off; “Off!” = work planned during time off. Planned load comes from assignments; actual load comes from timesheets.
+        </p>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -154,11 +197,15 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
                 </div>
               ))}
               <div>
-                <label className="label" htmlFor="weeks">Over weeks</label>
+                <label className="label" htmlFor="weeks">
+                  Over weeks
+                </label>
                 <input id="weeks" name="weeks" type="number" min={1} max={26} className="input" defaultValue={weeks} />
               </div>
               <div>
-                <label className="label" htmlFor="start">Starting</label>
+                <label className="label" htmlFor="start">
+                  Starting
+                </label>
                 <input id="start" name="start" type="date" className="input" defaultValue={startDate} />
               </div>
             </div>
@@ -166,7 +213,9 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
           </form>
           {assessment && (
             <div className="mt-4">
-              <div className={`mb-2 text-sm font-semibold ${assessment.feasible === "no" ? "text-bad" : assessment.feasible === "tight" ? "text-warn" : "text-good"}`}>{assessment.feasible === "no" ? "Not without changes: at least one role is short." : assessment.feasible === "tight" ? "Possible but tight." : "Yes, there is room."}</div>
+              <div className={`mb-2 text-sm font-semibold ${assessment.feasible === "no" ? "text-bad" : assessment.feasible === "tight" ? "text-warn" : "text-good"}`}>
+                {assessment.feasible === "no" ? "Not without changes: at least one role is short." : assessment.feasible === "tight" ? "Possible but tight." : "Yes, there is room."}
+              </div>
               <table className="w-full">
                 <thead>
                   <tr>
@@ -198,7 +247,7 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
       </div>
 
       {cap.gaps.length > 0 && (
-        <Card title="Staffing gaps">
+        <Card id="gaps" title="Staffing gaps" subtitle="Remaining effort with nobody assigned">
           <ul className="space-y-1 text-sm">
             {cap.gaps.map((g) => (
               <li key={g.projectId}>
