@@ -36,7 +36,7 @@ export function StatusPanel({ it, why }: { it: Interpretation; why?: ReactNode }
       <p className="mt-2 text-[15px] leading-relaxed text-ink">{it.headline}</p>
       <dl className="mt-3 divide-y divide-line/70 border-t border-line">
         {it.dimensions.map((d) => (
-          <div key={d.key} className="grid gap-1 py-2.5 sm:grid-cols-[170px_150px_1fr] sm:items-baseline sm:gap-3">
+          <div key={d.key} className="grid gap-1 py-2.5 sm:grid-cols-[150px_210px_1fr] sm:items-baseline sm:gap-3">
             <dt className="text-sm font-medium text-ink-soft">{d.label}</dt>
             <dd>
               <LevelBadge level={d.level}>{d.status}</LevelBadge>

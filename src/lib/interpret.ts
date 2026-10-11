@@ -56,6 +56,22 @@ function interventionDimension(ws: Workspace, issues: Issue[]): Dimension {
   return { key: "intervention", label, level: "good", status: "Plan in place", reason: `${p.title} (${v(p.ownerId)}), next update ${fmtDate(p.dueDate)}.${without ? ` ${without} other issue${without === 1 ? " has" : "s have"} no plan yet.` : ""}` };
 }
 
+/** "Relationship is at risk; delivery and financial are fine." Reasons stay in the rows below. */
+function summarize(core: Dimension[]): string {
+  const say = (ds: Dimension[]) => ds.map((d, i) => (i === 0 ? d.label : d.label.toLowerCase())).join(" and ");
+  const bad = core.filter((d) => d.level === "at_risk");
+  const watch = core.filter((d) => d.level === "watch");
+  const good = core.filter((d) => d.level === "good");
+  const unknown = core.filter((d) => d.level === "unknown");
+  const parts: string[] = [];
+  if (bad.length) parts.push(`${say(bad)} ${bad.length === 1 ? "is" : "are"} at risk`);
+  if (watch.length) parts.push(`${say(watch)} ${watch.length === 1 ? "needs" : "need"} watching`);
+  if (good.length && (bad.length || watch.length)) parts.push(`${say(good)} ${good.length === 1 ? "is" : "are"} fine`);
+  if (unknown.length) parts.push(`${say(unknown)} cannot be judged yet`);
+  const text = parts.map((x, i) => (i === 0 ? x : x.charAt(0).toLowerCase() + x.slice(1))).join("; ");
+  return text ? `${text}.` : "";
+}
+
 export function interpretAccount(ws: Workspace, accountId: ID, issues: Issue[]): Interpretation {
   const a = ws.analysis;
   const h = a.health[accountId];
@@ -78,7 +94,7 @@ export function interpretAccount(ws: Workspace, accountId: ID, issues: Issue[]):
     } else if (top && top.confidence !== "low") level = worse(level, "watch");
     const positive = a.signals.find((s) => s.accountId === accountId && s.polarity === "positive" && !s.autoResolved);
     if (positive && level !== "good") reason = `${reason.replace(/\.?$/, ".")} Positive feedback elsewhere is noted but does not cancel this.`;
-    dims.push({ key: "relationship", label: ws.profile.healthComponents.find((x) => x.key === "relationship")?.label ?? "Relationship", level, status: LEVEL_LABEL[level], reason });
+    dims.push({ key: "relationship", label: mode === "budget" ? "Stakeholders" : "Relationship", level, status: LEVEL_LABEL[level], reason });
   }
 
   // Delivery (or product usage for subscription businesses).
@@ -156,13 +172,7 @@ export function interpretAccount(ws: Workspace, accountId: ID, issues: Issue[]):
   const core = dims.filter((d) => d.key === "relationship" || d.key === "delivery" || d.key === "financial");
   const known = core.filter((d) => d.level !== "unknown" && d.level !== "restricted" && d.level !== "none");
   const overall: Level = h?.status === "insufficient" && !known.some((d) => d.level === "at_risk") ? "unknown" : known.reduce<Level>((m, d) => worse(m, d.level), known.length ? "good" : "unknown");
-  const worst = core.filter((d) => d.level === overall);
-  const headline =
-    overall === "unknown"
-      ? "Not enough current information to judge this account; missing data is not treated as healthy."
-      : overall === "good"
-        ? "No problems in relationship, delivery or finances."
-        : `${worst.map((d) => d.label).join(" and ")} ${worst.length === 1 ? "needs" : "need"} attention: ${worst[0].reason.replace(/\.$/, "")}.`;
+  const headline = overall === "unknown" ? "Not enough current information to judge; missing data is not treated as healthy." : overall === "good" ? "No problems in relationship, delivery or finances." : summarize(core);
   return { overall, overallLabel: overall === "unknown" ? "Not enough data" : overall === "good" ? "On track" : overall === "watch" ? "Watch" : "At risk", headline, dimensions: dims };
 }
 
@@ -202,11 +212,10 @@ export function interpretProject(ws: Workspace, projectId: ID, issues: Issue[]):
   const core = dims.filter((d) => d.key === "delivery" || d.key === "financial");
   const known = core.filter((d) => !["unknown", "restricted", "none"].includes(d.level));
   const overall = known.reduce<Level>((m, d) => worse(m, d.level), known.length ? "good" : "unknown");
-  const worst = core.filter((d) => d.level === overall);
   return {
     overall,
     overallLabel: overall === "good" ? "On track" : overall === "watch" ? "Watch" : overall === "at_risk" ? "At risk" : "Not enough data",
-    headline: overall === "good" ? "Delivery and finances are on track." : overall === "unknown" ? "Not enough information to judge." : `${worst.map((d) => d.label).join(" and ")} ${worst.length === 1 ? "needs" : "need"} attention: ${worst[0].reason.replace(/\.$/, "")}.`,
+    headline: overall === "good" ? "Delivery and finances are on track." : overall === "unknown" ? "Not enough information to judge." : summarize(core),
     dimensions: dims,
   };
 }
