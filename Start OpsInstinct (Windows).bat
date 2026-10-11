@@ -1,5 +1,5 @@
 @echo off
-rem Double-click to start the CompanyOS demo on Windows.
+rem Double-click to start the OpsInstinct demo on Windows.
 cd /d "%~dp0"
 where npm >nul 2>nul
 if errorlevel 1 (
@@ -16,7 +16,7 @@ if not exist node_modules (
     exit /b 1
   )
 )
-echo Starting CompanyOS. Your browser will open at http://localhost:3000
+echo Starting OpsInstinct. Your browser will open at http://localhost:3000
 echo Leave this window open while you use the demo. Close it to stop.
 start "" cmd /c "timeout /t 6 >nul && start http://localhost:3000"
 call npm run dev

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 import { SIGN_IN_REQUIRED, safeNext } from "@/lib/supabase/config";
 import { GoogleButton } from "./GoogleButton";
+import { LogoMark } from "@/components/Logo";
 
 const ERRORS: Record<string, string> = {
   not_approved: "That Google account hasn't been given access. Ask an executive to add your email in Settings.",
@@ -15,7 +16,10 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-sm rounded-xl border border-line bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-semibold">CompanyOS</h1>
+        <div className="flex items-center gap-2.5">
+          <LogoMark size={28} />
+          <h1 className="text-lg font-semibold">OpsInstinct</h1>
+        </div>
         <p className="mt-1 text-sm text-ink-soft">Demo with synthetic data. Sign in with an approved Google account.</p>
         {sp.error && ERRORS[sp.error] && (
           <p role="alert" className="mt-4 rounded-lg bg-bad-soft px-3 py-2 text-sm text-bad">

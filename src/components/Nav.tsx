@@ -3,6 +3,7 @@
 import { BadgeDollarSign, Building2, Calculator, CircleAlert, FolderKanban, House, LayoutDashboard, type LucideIcon, Menu, MessagesSquare, Plug, Radar, Settings, ShieldCheck, SquareCheckBig, Users, Wallet, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LogoMark } from "./Logo";
 import { type ReactNode, useState } from "react";
 
 export interface NavItem {
@@ -106,11 +107,9 @@ export function Nav({ items, orgName, profileLabel, controls }: { items: NavItem
 
   const brand = (
     <div className="flex items-center gap-2.5">
-      <div aria-hidden="true" className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-[#7c74ff] to-[#4a43d4] text-[11px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
-        OS
-      </div>
+      <LogoMark className="shrink-0 rounded-lg shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]" />
       <div>
-        <div className="text-[14px] font-semibold leading-tight tracking-tight text-white">CompanyOS</div>
+        <div className="text-[14px] font-semibold leading-tight tracking-tight text-white">OpsInstinct</div>
         <div className="text-[11px] leading-tight text-sidebar-text/80">Demo · synthetic data</div>
       </div>
     </div>

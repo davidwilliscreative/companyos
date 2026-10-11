@@ -55,7 +55,7 @@ export interface Connector<TRecord = unknown> {
   requiredScopes: string[];
   status(ctx: ConnectorContext): Promise<ConnectorStatus>;
   sync(ctx: ConnectorContext, cursor: SyncCursor | null): Promise<SyncResult<TRecord>>;
-  /** Suggest matches between external names (e.g. a ClickUp folder) and CompanyOS accounts/projects. Low-confidence matches must wait for review. */
+  /** Suggest matches between external names (e.g. a ClickUp folder) and OpsInstinct accounts/projects. Low-confidence matches must wait for review. */
   suggestMappings(ctx: ConnectorContext, ds: Dataset): Promise<EntityMapping[]>;
 }
 
