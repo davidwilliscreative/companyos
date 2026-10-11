@@ -7,11 +7,11 @@ import { EvidenceLinks } from "./blocks";
 import { Card, HealthBadge, Notice } from "./ui";
 
 /** A change with its direction spelled out, not only colored. */
-export function ChangeRow({ ws, c }: { ws: Workspace; c: ChangeItem }) {
+export function ChangeRow({ ws, c, className = "" }: { ws: Workspace; c: ChangeItem; className?: string }) {
   const worse = c.direction === "worse";
   const better = c.direction === "better";
   return (
-    <li className="text-sm">
+    <li className={`text-sm ${className}`}>
       <div className="flex items-start gap-2">
         <span className={`mt-0.5 shrink-0 rounded px-1.5 py-px text-[11px] font-semibold ${worse ? "bg-bad-soft text-bad" : better ? "bg-good-soft text-good" : "bg-canvas text-ink-soft"}`}>
           <span aria-hidden="true">{worse ? "▼ " : better ? "▲ " : ""}</span>
@@ -53,10 +53,26 @@ export function WeeklyReport({ ws }: { ws: Workspace }) {
       </p>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="What got worse" subtitle={`${worse.length} change${worse.length === 1 ? "" : "s"}`}>
-          {worse.length === 0 ? <p className="text-sm text-ink-muted">Nothing got worse in the last 7 days.</p> : <ul className="space-y-3">{worse.map((c, i) => <ChangeRow key={i} ws={ws} c={c} />)}</ul>}
+          {worse.length === 0 ? (
+            <p className="text-sm text-ink-muted">Nothing got worse in the last 7 days.</p>
+          ) : (
+            <ul className="space-y-3">
+              {worse.map((c, i) => (
+                <ChangeRow key={i} ws={ws} c={c} />
+              ))}
+            </ul>
+          )}
         </Card>
         <Card title="What got better or was completed" subtitle={`${better.length} change${better.length === 1 ? "" : "s"}`}>
-          {better.length === 0 ? <p className="text-sm text-ink-muted">No improvements recorded in the last 7 days.</p> : <ul className="space-y-3">{better.map((c, i) => <ChangeRow key={i} ws={ws} c={c} />)}</ul>}
+          {better.length === 0 ? (
+            <p className="text-sm text-ink-muted">No improvements recorded in the last 7 days.</p>
+          ) : (
+            <ul className="space-y-3">
+              {better.map((c, i) => (
+                <ChangeRow key={i} ws={ws} c={c} />
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
       <div className="grid gap-6 lg:grid-cols-3">

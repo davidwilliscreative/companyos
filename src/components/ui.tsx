@@ -259,7 +259,7 @@ export function Bar({ value, max = 1, tone = "accent", label }: { value: number;
 }
 
 export function SourceTag({ system, detail }: { system: string; detail?: string }) {
-  const label: Record<string, string> = { seed: "Demo seed", sheets: "Google Sheets (simulated)", clickup: "ClickUp (simulated)", gmail: "Gmail (simulated)", slack: "Slack (simulated)", accounting: "Accounting (simulated)", manual: "Manual" };
+  const label: Record<string, string> = { seed: "Demo data", sheets: "Google Sheets (simulated)", clickup: "ClickUp (simulated)", gmail: "Gmail (simulated)", slack: "Slack (simulated)", accounting: "Accounting (simulated)", manual: "Manual" };
   return (
     <span className="text-[11px] text-ink-muted" title={detail}>
       Source: {label[system] ?? system}

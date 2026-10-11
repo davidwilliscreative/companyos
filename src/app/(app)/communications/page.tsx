@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FilterForm } from "@/components/filters";
 import { Badge, Card, EmptyState, Notice, PageHeader, Restricted } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
 import { fmtDate } from "@/lib/dates";
@@ -32,13 +33,17 @@ export default async function CommunicationsPage({ searchParams }: { searchParam
       <PageHeader title="Communications" subtitle="Simulated email and Slack threads from explicitly authorized mailboxes and channels. Message content is treated as untrusted data: it is analysed, never followed as instructions." />
       {ws.caps.communications === "billing_only" && <Notice tone="info">Your role sees billing conversations only.</Notice>}
       {ws.caps.communications === "own_accounts" && <Notice tone="info">You see threads for the accounts you own.</Notice>}
-      <form className="card flex flex-wrap items-end gap-3 p-3" role="search">
+      <FilterForm label="Search messages">
         <div className="min-w-[200px] flex-1">
-          <label className="label" htmlFor="q">Search messages</label>
-          <input id="q" name="q" className="input" defaultValue={q} />
+          <label className="label" htmlFor="q">
+            Search messages
+          </label>
+          <input id="q" name="q" type="search" className="input" defaultValue={q} placeholder="Words, then Enter" />
         </div>
         <div>
-          <label className="label" htmlFor="account">{ws.profile.terms.account}</label>
+          <label className="label" htmlFor="account">
+            {ws.profile.terms.account}
+          </label>
           <select id="account" name="account" className="input" defaultValue={account}>
             <option value="all">All</option>
             {ws.data.accounts.map((a) => (
@@ -49,15 +54,19 @@ export default async function CommunicationsPage({ searchParams }: { searchParam
           </select>
         </div>
         <div>
-          <label className="label" htmlFor="channel">Channel</label>
+          <label className="label" htmlFor="channel">
+            Channel
+          </label>
           <select id="channel" name="channel" className="input" defaultValue={channel}>
             <option value="all">All</option>
             <option value="email">Email</option>
             <option value="slack">Slack</option>
           </select>
         </div>
-        <button className="btn btn-primary">Apply</button>
-      </form>
+        <noscript>
+          <button className="btn btn-primary">Apply</button>
+        </noscript>
+      </FilterForm>
       <Card padded={false} title={`${threads.length} threads`}>
         {threads.length === 0 ? (
           <div className="p-4">

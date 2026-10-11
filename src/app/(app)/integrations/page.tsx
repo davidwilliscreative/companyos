@@ -17,7 +17,7 @@ export default async function IntegrationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Integrations"
-        subtitle="Every connector in this demo is simulated. Nothing connects to Gmail, Slack, ClickUp, accounting or any AI service. The interfaces are ready for real connectors (see docs/connectors.md)."
+        subtitle="Every connector in this demo is simulated. Nothing connects to Gmail, Slack, ClickUp, accounting or any AI service."
         actions={
           <Link href="/integrations/sheets" className="btn btn-primary">
             Google Sheets import (simulated)

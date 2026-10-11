@@ -80,7 +80,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 lg:px-10">
               <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-soft">
                 <span
-                  title="Synthetic data only. All connector statuses are simulated and the assistant is a deterministic simulation (no AI service connected). Not production-ready."
+                  title="Synthetic data only. All connector statuses are simulated and the assistant gives prepared answers from this data; no AI service is connected."
                   className="inline-flex items-center gap-1.5 rounded-full bg-warn-soft px-2.5 py-1 text-xs font-semibold text-warn ring-1 ring-inset ring-warn-line"
                 >
                   <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warn" />

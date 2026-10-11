@@ -143,7 +143,8 @@ export function IssueCard({ ws, issue, compact = false, index, titles = {} }: { 
         <ReviewState issue={issue} />
       </div>
       <h3 className="mt-2 text-[16px] font-semibold leading-snug tracking-tight text-ink">{issue.title}</h3>
-      <p className="mt-1 text-sm leading-relaxed text-ink-soft">{issue.what}</p>
+      {/* On phones a Home card leads with why it matters; the detail is one tap away. */}
+      <p className={`mt-1 text-sm leading-relaxed text-ink-soft ${compact ? "hidden sm:block" : ""}`}>{issue.what}</p>
       {issue.why && (
         <p className="mt-1.5 text-sm leading-relaxed text-ink">
           <span className="font-medium">Why it matters: </span>
@@ -151,7 +152,7 @@ export function IssueCard({ ws, issue, compact = false, index, titles = {} }: { 
         </p>
       )}
 
-      <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+      <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
         <div>
           <dt className="text-xs font-medium text-ink-muted">Owner</dt>
           <dd className="font-medium">{v.person(issue.ownerId)}</dd>
@@ -177,10 +178,9 @@ export function IssueCard({ ws, issue, compact = false, index, titles = {} }: { 
       </div>
 
       <details className="group mt-3">
-        <summary className="cursor-pointer select-none text-[13px] font-medium text-accent">
-          Show impact, evidence and affected {ws.profile.terms.accounts.toLowerCase()}
-        </summary>
+        <summary className="cursor-pointer select-none text-[13px] font-medium text-accent">Show impact, evidence and affected {ws.profile.terms.accounts.toLowerCase()}</summary>
         <div className="mt-3 space-y-3 text-sm">
+          {compact && <p className="text-ink-soft sm:hidden">{issue.what}</p>}
           {issue.executiveReason && <p className="text-violet">{issue.executiveReason}</p>}
           {impacts.length > 0 && (
             <div>
@@ -257,12 +257,22 @@ const TIME_LABEL = { historical: "Past period", current: "Current", forecast: "F
 export function MetricCard({ m }: { m: Metric }) {
   const toneCls = m.tone === "bad" ? "text-bad" : m.tone === "warn" ? "text-warn" : m.tone === "good" ? "text-good" : "text-ink";
   return (
-    <div className="card flex h-full flex-col p-4 sm:p-5">
+    <div className="card flex h-full flex-col p-3.5 sm:p-5">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-[13px] font-medium text-ink-soft">{m.href ? <Link href={m.href} className="link-quiet">{m.label}</Link> : m.label}</div>
-        <KindTag kind={m.kind} quiet />
+        <div className="text-[13px] font-medium text-ink-soft">
+          {m.href ? (
+            <Link href={m.href} className="link-quiet">
+              {m.label}
+            </Link>
+          ) : (
+            m.label
+          )}
+        </div>
+        <span className="hidden sm:inline">
+          <KindTag kind={m.kind} quiet />
+        </span>
       </div>
-      <div className={`mt-2 text-[26px] font-semibold leading-none tabular-nums tracking-tightest ${toneCls}`}>
+      <div className={`mt-2 text-[22px] sm:text-[26px] font-semibold leading-none tabular-nums tracking-tightest ${toneCls}`}>
         {m.value}
         {m.tone && <span className="sr-only"> ({m.tone === "bad" ? "needs attention" : m.tone === "warn" ? "watch" : "good"})</span>}
       </div>

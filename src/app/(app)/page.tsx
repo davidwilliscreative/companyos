@@ -8,6 +8,9 @@ import { homeFor } from "@/lib/home";
 import { buildIssues } from "@/lib/issues";
 import { ROLES } from "@/lib/permissions";
 
+const MOBILE_ISSUES = 3;
+const MOBILE_CHANGES = 3;
+
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const { view } = await searchParams;
   const ws = await getWorkspace();
@@ -42,9 +45,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 Your briefing
               </h2>
               <div className="flex flex-wrap items-center gap-2 text-sm" role="status">
-                <span className={`rounded-full px-2.5 py-0.5 font-semibold ${counts.urgent ? "bg-bad-soft text-bad" : "bg-canvas text-ink-soft"}`}>
-                  {counts.urgent} urgent
-                </span>
+                <span className={`rounded-full px-2.5 py-0.5 font-semibold ${counts.urgent ? "bg-bad-soft text-bad" : "bg-canvas text-ink-soft"}`}>{counts.urgent} urgent</span>
                 {ws.ctx.role === "executive" && counts.executive > 0 && <span className="rounded-full bg-violet-soft px-2.5 py-0.5 font-semibold text-violet">{counts.executive} need you</span>}
                 <Link href="/issues">{counts.total} open issues</Link>
               </div>
@@ -58,14 +59,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </div>
           </section>
 
-          {home.dataWarnings.length > 0 && (
-            <Notice title="Some figures may be out of date">
-              {home.dataWarnings.join(" ")}
-            </Notice>
-          )}
+          {home.dataWarnings.length > 0 && <Notice title="Some figures may be out of date">{home.dataWarnings.join(" ")}</Notice>}
 
           {home.metrics.length > 0 && (
-            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
               {home.metrics.map((m) => (
                 <MetricCard key={m.label} m={m} />
               ))}
@@ -87,12 +84,22 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             ) : (
               <div className="space-y-3">
                 {home.issues.map((i, n) => (
-                  <IssueCard key={i.id} ws={ws} issue={i} compact index={n + 1} titles={titles} />
+                  // Phones show the top three; the rest are on the issues list.
+                  <div key={i.id} className={n >= MOBILE_ISSUES ? "hidden sm:block" : undefined}>
+                    <IssueCard ws={ws} issue={i} compact index={n + 1} titles={titles} />
+                  </div>
                 ))}
               </div>
             )}
+            {counts.total > MOBILE_ISSUES && (
+              <p className="text-sm sm:hidden">
+                <Link href="/issues">
+                  See all {counts.total} issues{counts.urgent > 0 ? `, ${counts.urgent} urgent` : ""} →
+                </Link>
+              </p>
+            )}
             {counts.total > home.issues.length && (
-              <p className="text-sm">
+              <p className="hidden text-sm sm:block">
                 <Link href="/issues">
                   {counts.total - home.issues.length} more on the issues list{hiddenUrgent > 0 ? `, ${hiddenUrgent} of them urgent` : ""} →
                 </Link>
@@ -106,7 +113,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             ) : (
               <ul className="space-y-3">
                 {home.since.items.map((c, i) => (
-                  <ChangeRow key={i} ws={ws} c={c} />
+                  <ChangeRow key={i} ws={ws} c={c} className={i >= MOBILE_CHANGES ? "hidden sm:list-item" : ""} />
                 ))}
               </ul>
             )}

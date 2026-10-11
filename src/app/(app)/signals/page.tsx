@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FilterForm } from "@/components/filters";
 import { SignalRow } from "@/components/blocks";
 import { OpportunityEditor } from "@/components/forms";
 import { Badge, Card, EmptyState, KindTag, Notice, PageHeader } from "@/components/ui";
@@ -42,7 +43,10 @@ export default async function SignalsPage({ searchParams }: { searchParams: SP }
 
   return (
     <div className="space-y-6">
-      <PageHeader title={ws.profile.modules.expansion ? "Signals and opportunities" : "Signals"} subtitle="Inferred from authorized communications using transparent rules. Each signal shows its evidence, contradicting messages and how confident the evidence is. Signals never produce churn probabilities." />
+      <PageHeader
+        title={ws.profile.modules.expansion ? "Signals and opportunities" : "Signals"}
+        subtitle="Inferred from authorized communications using transparent rules. Each signal shows its evidence, contradicting messages and how confident the evidence is. Signals never produce churn probabilities."
+      />
       <Notice tone="info" title="What confidence means">
         {CONFIDENCE_EXPLAINER}
       </Notice>
@@ -51,17 +55,24 @@ export default async function SignalsPage({ searchParams }: { searchParams: SP }
 
       <nav aria-label="Signal views" className="flex flex-wrap gap-1 border-b border-line">
         {tabs.map((t) => (
-          <Link key={t.key} href={qs({ tab: t.key })} aria-current={tab === t.key ? "page" : undefined} className={`-mb-px rounded-t-lg border px-3 py-1.5 text-sm no-underline hover:no-underline ${tab === t.key ? "border-line border-b-white bg-white font-medium text-ink" : "border-transparent text-ink-soft hover:text-ink"}`}>
+          <Link
+            key={t.key}
+            href={qs({ tab: t.key })}
+            aria-current={tab === t.key ? "page" : undefined}
+            className={`-mb-px rounded-t-lg border px-3 py-1.5 text-sm no-underline hover:no-underline ${tab === t.key ? "border-line border-b-white bg-white font-medium text-ink" : "border-transparent text-ink-soft hover:text-ink"}`}
+          >
             {t.label}
           </Link>
         ))}
       </nav>
 
       {tab !== "opportunities" && (
-        <form className="flex flex-wrap items-end gap-3" aria-label="Filter signals">
+        <FilterForm label="Filter signals">
           <input type="hidden" name="tab" value={tab} />
           <div>
-            <label className="label" htmlFor="account">{ws.profile.terms.account}</label>
+            <label className="label" htmlFor="account">
+              {ws.profile.terms.account}
+            </label>
             <select id="account" name="account" className="input" defaultValue={account}>
               <option value="all">All</option>
               {ws.data.accounts.map((x) => (
@@ -72,7 +83,9 @@ export default async function SignalsPage({ searchParams }: { searchParams: SP }
             </select>
           </div>
           <div>
-            <label className="label" htmlFor="category">Category</label>
+            <label className="label" htmlFor="category">
+              Category
+            </label>
             <select id="category" name="category" className="input" defaultValue={category}>
               <option value="all">All</option>
               {categories.map((c) => (
@@ -83,7 +96,9 @@ export default async function SignalsPage({ searchParams }: { searchParams: SP }
             </select>
           </div>
           <div>
-            <label className="label" htmlFor="review">Review status</label>
+            <label className="label" htmlFor="review">
+              Review status
+            </label>
             <select id="review" name="review" className="input" defaultValue={review}>
               <option value="all">All</option>
               <option value="unreviewed">Unreviewed</option>
@@ -92,11 +107,15 @@ export default async function SignalsPage({ searchParams }: { searchParams: SP }
               <option value="resolved">Resolved</option>
             </select>
           </div>
-          <button className="btn btn-primary">Apply</button>
-          <Link href={`/signals?tab=${tab}`} className="btn">
-            Clear
-          </Link>
-        </form>
+          <noscript>
+            <button className="btn btn-primary">Apply</button>
+          </noscript>
+          {(account !== "all" || category !== "all" || review !== "all") && (
+            <Link href={`/signals?tab=${tab}`} className="btn">
+              Clear filters
+            </Link>
+          )}
+        </FilterForm>
       )}
 
       {tab === "opportunities" ? (
@@ -106,7 +125,13 @@ export default async function SignalsPage({ searchParams }: { searchParams: SP }
             <EmptyState title="No opportunities detected" />
           ) : (
             opps.map((o) => (
-              <Card key={o.id} id={o.id} title={`${v.account(o.accountId)}: ${o.offering}`} subtitle={o.readinessReason} actions={<Badge tone={o.readiness === "ready" ? "good" : o.readiness === "developing" ? "accent" : "neutral"}>{o.readiness}</Badge>}>
+              <Card
+                key={o.id}
+                id={o.id}
+                title={`${v.account(o.accountId)}: ${o.offering}`}
+                subtitle={o.readinessReason}
+                actions={<Badge tone={o.readiness === "ready" ? "good" : o.readiness === "developing" ? "accent" : "neutral"}>{o.readiness}</Badge>}
+              >
                 <blockquote className="border-l-2 border-accent pl-3 text-sm text-ink">“{o.need}”</blockquote>
                 <div className="mt-2 flex flex-wrap gap-4 text-sm">
                   <span>

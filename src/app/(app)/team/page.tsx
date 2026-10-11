@@ -75,7 +75,34 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
           )
         }
       >
-        <div className="overflow-x-auto">
+        {/* Phones: one row per person with the next four weeks of planned load. */}
+        <ul className="divide-y divide-line md:hidden">
+          {people.map((pc) => {
+            const over = cap.overallocated.some((o) => o.person.id === pc.person.id);
+            return (
+              <li key={pc.person.id} className="px-4 py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-medium">{pc.person.name}</span>
+                  {over && <span className="text-xs font-medium text-bad">! Over capacity</span>}
+                </div>
+                <div className="text-xs text-ink-muted">
+                  {pc.person.title}
+                  {pc.person.fte < 1 && ` · ${pc.person.fte} FTE`}
+                  {billable && pc.delivery && ` · ${fmtPct(pc.period.utilization)} billable`}
+                </div>
+                <div className="mt-2 grid grid-cols-4 gap-1">
+                  {pc.upcoming.weeks.slice(0, 4).map((w) => (
+                    <div key={w.week} className={`rounded-md px-1 py-1 text-center text-[11px] font-medium tabular-nums ${Number.isFinite(w.pct) ? heat(w.pct) : w.planned > 0 ? "bg-bad text-white" : "bg-canvas text-ink-faint"}`}>
+                      <div className="text-[10px] font-normal opacity-80">{fmtDate(w.week)}</div>
+                      {!Number.isFinite(w.pct) ? (w.planned > 0 ? "Off!" : "Off") : `${Math.round(w.pct * 100)}%`}
+                    </div>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px]">
             <thead>
               <tr>

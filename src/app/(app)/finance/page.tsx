@@ -154,7 +154,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
               <h2 id="results-title" className="text-lg font-semibold tracking-tight">
                 Results for {a.period.label}
               </h2>
-              <div className={`grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 ${results.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
+              <div className={`grid grid-cols-2 gap-2.5 sm:gap-3 ${results.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
                 {results.map((m) => (
                   <MetricCard key={m.label} m={m} />
                 ))}
@@ -169,7 +169,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
               <h2 id="cashflow-title" className="text-lg font-semibold tracking-tight">
                 Billing and cash
               </h2>
-              <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
                 {billing.map((m) => (
                   <MetricCard key={m.label} m={m} />
                 ))}
@@ -397,7 +397,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
           </div>
           <ul className="space-y-1.5">
             {fin.concentration.rows.map((r) => (
-              <li key={r.accountId} className="grid grid-cols-[160px_1fr_90px_50px] items-center gap-3 text-sm">
+              <li key={r.accountId} className="grid grid-cols-[minmax(0,120px)_1fr_64px] items-center gap-3 text-sm sm:grid-cols-[160px_1fr_90px_50px]">
                 <Link href={`/accounts/${r.accountId}`} className="truncate">
                   {v.account(r.accountId)}
                 </Link>
@@ -405,7 +405,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
                   <div className="h-2 rounded-full bg-accent" style={{ width: `${Math.round(r.share * 100)}%` }} />
                 </div>
                 <span className="text-right tabular-nums">{v.money(r.revenue, { compact: true })}</span>
-                <span className="text-right text-xs tabular-nums text-ink-muted">{fmtPct(r.share)}</span>
+                <span className="hidden text-right text-xs tabular-nums text-ink-muted sm:inline">{fmtPct(r.share)}</span>
               </li>
             ))}
           </ul>
