@@ -4,49 +4,28 @@ import { LevelBadge } from "@/components/status";
 import { Bar, Card, EmptyState, MilestoneBadge, PageHeader } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
 import { fmtDate } from "@/lib/dates";
-import { interpretProject } from "@/lib/interpret";
 import { buildIssues } from "@/lib/issues";
 import { fmtHours, fmtPct } from "@/lib/money";
 import { aggregateScope } from "@/lib/permissions";
 import { viewHelpers } from "@/lib/view";
+import { inProjectView, PROJECT_VIEWS, type ProjectRow, type ProjectView, parseView, projectRows, STATUS_RANK } from "@/lib/views";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 const BILLING_LABEL: Record<string, string> = { fixed_fee: "Fixed fee", retainer: "Retainer", time_materials: "Time & materials", internal: "Internal" };
-const VIEWS = ["mine", "intervention", "gaps"] as const;
-type View = (typeof VIEWS)[number];
-const STATUS_RANK = { at_risk: 0, watch: 1, unknown: 2, good: 3, restricted: 4, none: 5 } as const;
 
 export default async function ProjectsPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const ws = await getWorkspace();
   const v = viewHelpers(ws);
   const t = ws.profile.terms;
-  const a = ws.analysis;
   const str = (k: string, d: string) => (typeof sp[k] === "string" ? (sp[k] as string) : d);
   const billing = str("billing", "all");
   const status = str("status", "open");
   const account = str("account", "all");
   const problem = str("problem", "all");
-  const view = (VIEWS as readonly string[]).includes(str("view", "")) ? (str("view", "") as View) : null;
-  const issues = buildIssues(ws);
-  const gapIds = new Set(a.capacity.gaps.map((g) => g.projectId));
-
-  const rows = ws.data.projects.map((p) => {
-    const f = a.projectFin[p.id];
-    const ms = ws.data.milestones.filter((m) => m.projectId === p.id);
-    const worst = ms.map((m) => a.milestones[m.id]).filter((x) => x && x.state !== "done");
-    const order = ["late", "blocked", "awaiting_client", "at_risk", "on_track"] as const;
-    const worstState = order.find((s) => worst.some((w) => w.state === s));
-    const marginProblem = !!f && f.margin.variance !== null && f.margin.variance < -0.05;
-    const budgetProblem = !!f && f.budget.forecastVsBudget !== null && f.budget.forecastVsBudget > 0;
-    const scheduleProblem = worstState === "late" || worstState === "blocked" || worstState === "awaiting_client" || (f?.schedule.slipDays ?? 0) > 14;
-    const own = issues.filter((i) => i.kind !== "opportunity" && i.projectIds.includes(p.id));
-    const it = interpretProject(ws, p.id, issues);
-    const intervention = p.status !== "completed" && (it.overall === "at_risk" || own.some((i) => i.severity === "critical" || i.severity === "high"));
-    const staffingGap = p.status !== "completed" && (gapIds.has(p.id) || own.some((i) => i.kind === "staffing"));
-    return { p, f, worstState, marginProblem, budgetProblem, scheduleProblem, own, it, intervention, staffingGap };
-  });
-  const inView = (r: (typeof rows)[number], vw: View | null) => (vw === "mine" ? r.p.ownerId === ws.user.id && r.p.status !== "completed" : vw === "intervention" ? r.intervention : vw === "gaps" ? r.staffingGap : true);
+  const view = parseView(PROJECT_VIEWS, sp.view);
+  const rows = projectRows(ws, buildIssues(ws));
+  const inView = (r: ProjectRow, vw: ProjectView | null) => inProjectView(r, vw, ws.user.id);
   const filtered = rows
     .filter((r) => inView(r, view))
     .filter((r) => billing === "all" || r.p.billing === billing)

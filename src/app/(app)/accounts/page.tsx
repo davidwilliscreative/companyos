@@ -3,19 +3,14 @@ import { FilterForm, Presets } from "@/components/filters";
 import { LevelBadge } from "@/components/status";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
-import { daysBetween, fmtDate } from "@/lib/dates";
-import { interpretAccount } from "@/lib/interpret";
+import { fmtDate } from "@/lib/dates";
 import { buildIssues } from "@/lib/issues";
 import { fmtPct } from "@/lib/money";
 import { aggregateScope } from "@/lib/permissions";
 import { viewHelpers } from "@/lib/view";
+import { ACCOUNT_VIEWS, type AccountRow, type AccountView, accountRows, inAccountView, parseView, RENEWAL_WINDOW_DAYS, STATUS_RANK } from "@/lib/views";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
-
-/** Renewals inside this window count as "soon". */
-const RENEWAL_WINDOW_DAYS = 120;
-const VIEWS = ["mine", "attention", "renewals", "overdue"] as const;
-type View = (typeof VIEWS)[number];
 
 export default async function AccountsPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
@@ -27,43 +22,12 @@ export default async function AccountsPage({ searchParams }: { searchParams: SP 
   const q = str("q", "").trim().toLowerCase();
   const status = str("status", "all");
   const owner = str("owner", "all");
-  const view = (VIEWS as readonly string[]).includes(str("view", "")) ? (str("view", "") as View) : null;
+  const view = parseView(ACCOUNT_VIEWS, sp.view);
   const sort = str("sort", view === "renewals" ? "renewal" : "status");
   const mode = ws.profile.modules.financeMode;
   const showOverdue = ws.profile.modules.invoices && ws.caps.viewCommercialTerms;
-  const allIssues = buildIssues(ws);
-  const issues = allIssues.filter((i) => i.kind !== "opportunity");
-  const today = ws.org.demoDate;
-
-  const rows = ws.data.accounts.map((acc) => {
-    const own = issues.filter((i) => i.accountIds.includes(acc.id));
-    const it = interpretAccount(ws, acc.id, allIssues);
-    const projects = ws.data.projects.filter((p) => p.accountId === acc.id && p.status !== "completed");
-    const lines = ws.finance?.summary.lines.filter((l) => l.accountId === acc.id) ?? null;
-    const revenue = lines ? lines.reduce((s, l) => s + (l.earned ?? 0), 0) : null;
-    const cost = lines ? lines.reduce((s, l) => s + l.labor + l.contractor + l.expenses, 0) : null;
-    const margin = revenue && cost !== null ? (revenue - cost) / revenue : null;
-    const sub = ws.data.subscriptions.find((s) => s.accountId === acc.id);
-    const overdue = a.receivables.overdue.filter((s) => s.invoice.accountId === acc.id).reduce((s, x) => s + x.outstanding, 0);
-    const renewal = a.renewals.find((r) => r.accountId === acc.id);
-    const renewalDays = renewal ? daysBetween(today, renewal.renewalDate) : null;
-    const renewalRisk = own.some((i) => i.kind === "relationship");
-    const budget = ws.data.projects.filter((p) => p.accountId === acc.id && p.billing === "internal").reduce((s, p) => s + (p.budgetCost ?? 0), 0);
-    const urgent = own.filter((i) => i.severity === "critical" || i.severity === "high");
-    return { acc, it, own, urgent, projects, revenue, margin, sub, overdue, renewal, renewalDays, renewalRisk, budget };
-  });
-
-  const inView = (r: (typeof rows)[number], vw: View | null) =>
-    vw === "mine"
-      ? r.acc.ownerId === ws.user.id
-      : vw === "attention"
-        ? r.own.length > 0 || r.it.overall === "at_risk"
-        : vw === "renewals"
-          ? r.renewalDays !== null && r.renewalDays <= RENEWAL_WINDOW_DAYS
-          : vw === "overdue"
-            ? r.overdue > 0
-            : true;
-  const STATUS_RANK = { at_risk: 0, watch: 1, unknown: 2, good: 3, restricted: 4, none: 5 } as const;
+  const rows = accountRows(ws, buildIssues(ws));
+  const inView = (r: AccountRow, vw: AccountView | null) => inAccountView(r, vw, ws.user.id);
 
   const filtered = rows
     .filter((r) => inView(r, view))
