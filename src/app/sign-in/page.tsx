@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-import { AUTH_ENABLED, safeNext } from "@/lib/supabase/config";
+import { SIGN_IN_REQUIRED, safeNext } from "@/lib/supabase/config";
 import { GoogleButton } from "./GoogleButton";
 
 const ERRORS: Record<string, string> = {
@@ -10,7 +10,7 @@ const ERRORS: Record<string, string> = {
 };
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  if (!AUTH_ENABLED) redirect("/");
+  if (!SIGN_IN_REQUIRED) redirect("/");
   const sp = await searchParams;
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-4">

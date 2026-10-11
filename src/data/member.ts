@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { RoleId } from "@/domain/types";
 import { isRole } from "@/lib/permissions";
-import { AUTH_ENABLED } from "@/lib/supabase/config";
+import { SIGN_IN_REQUIRED } from "@/lib/supabase/config";
 import { supabaseForRequest } from "@/lib/supabase/server";
 
 export interface Member {
@@ -13,12 +13,12 @@ export interface Member {
 }
 
 /**
- * The signed-in person's membership, or null in the local demo (no sign-in configured).
+ * The signed-in person's membership, or null in the local demo or public preview (no sign-in).
  * Signed-in people without a membership row are signed out: signing in with Google proves who
  * someone is, the members table decides whether they get in and with which role.
  */
 export const getMember = cache(async (): Promise<Member | null> => {
-  if (!AUTH_ENABLED) return null;
+  if (!SIGN_IN_REQUIRED) return null;
   const sb = await supabaseForRequest();
   const {
     data: { user },
