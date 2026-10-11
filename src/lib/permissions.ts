@@ -74,7 +74,7 @@ export const CAPABILITY_LABELS: [keyof Capabilities, string][] = [
   ["viewCommercialTerms", "Contract values and invoice amounts"],
   ["communications", "Authorized communications"],
   ["reviewSignals", "Review signals"],
-  ["manageActions", "Create and manage actions"],
+  ["manageActions", "Create and manage plans"],
   ["applyScenarios", "Apply what-if scenarios"],
   ["manageIntegrations", "Manage integrations and mappings"],
   ["importDatasets", "Imports"],

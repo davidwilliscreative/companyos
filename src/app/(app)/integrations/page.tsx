@@ -142,7 +142,7 @@ export default async function IntegrationsPage() {
         )}
       </Card>
 
-      <Card title="Import history">
+      <Card id="imports" title="Import history">
         {batches.length === 0 ? (
           <p className="text-sm text-ink-muted">No imports yet in this demo session.</p>
         ) : (

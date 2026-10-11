@@ -1,12 +1,21 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState, HealthBadge, PageHeader, Trend } from "@/components/ui";
+import { FilterForm, Presets } from "@/components/filters";
+import { LevelBadge } from "@/components/status";
+import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { getWorkspace } from "@/data/session";
-import { fmtDate } from "@/lib/dates";
+import { daysBetween, fmtDate } from "@/lib/dates";
+import { interpretAccount } from "@/lib/interpret";
+import { buildIssues } from "@/lib/issues";
 import { fmtPct } from "@/lib/money";
-import { CATEGORY_LABEL } from "@/lib/signals/engine";
+import { aggregateScope } from "@/lib/permissions";
 import { viewHelpers } from "@/lib/view";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
+
+/** Renewals inside this window count as "soon". */
+const RENEWAL_WINDOW_DAYS = 120;
+const VIEWS = ["mine", "attention", "renewals", "overdue"] as const;
+type View = (typeof VIEWS)[number];
 
 export default async function AccountsPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
@@ -14,168 +23,247 @@ export default async function AccountsPage({ searchParams }: { searchParams: SP 
   const v = viewHelpers(ws);
   const t = ws.profile.terms;
   const a = ws.analysis;
-  const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
-  const status = typeof sp.status === "string" ? sp.status : "all";
-  const owner = typeof sp.owner === "string" ? sp.owner : "all";
-  const sort = typeof sp.sort === "string" ? sp.sort : "health";
+  const str = (k: string, d: string) => (typeof sp[k] === "string" ? (sp[k] as string) : d);
+  const q = str("q", "").trim().toLowerCase();
+  const status = str("status", "all");
+  const owner = str("owner", "all");
+  const view = (VIEWS as readonly string[]).includes(str("view", "")) ? (str("view", "") as View) : null;
+  const sort = str("sort", view === "renewals" ? "renewal" : "status");
+  const mode = ws.profile.modules.financeMode;
+  const showOverdue = ws.profile.modules.invoices && ws.caps.viewCommercialTerms;
+  const allIssues = buildIssues(ws);
+  const issues = allIssues.filter((i) => i.kind !== "opportunity");
+  const today = ws.org.demoDate;
 
   const rows = ws.data.accounts.map((acc) => {
-    const h = a.health[acc.id];
-    const prev = a.healthPrev[acc.id];
+    const own = issues.filter((i) => i.accountIds.includes(acc.id));
+    const it = interpretAccount(ws, acc.id, allIssues);
     const projects = ws.data.projects.filter((p) => p.accountId === acc.id && p.status !== "completed");
-    const revenue = ws.finance?.summary.lines.filter((l) => l.accountId === acc.id).reduce((s, l) => s + (l.earned ?? 0), 0) ?? null;
-    const sub = ws.data.subscriptions.find((s) => s.accountId === acc.id);
-    const cost = ws.finance?.summary.lines.filter((l) => l.accountId === acc.id).reduce((s, l) => s + l.labor + l.contractor + l.expenses, 0) ?? null;
+    const lines = ws.finance?.summary.lines.filter((l) => l.accountId === acc.id) ?? null;
+    const revenue = lines ? lines.reduce((s, l) => s + (l.earned ?? 0), 0) : null;
+    const cost = lines ? lines.reduce((s, l) => s + l.labor + l.contractor + l.expenses, 0) : null;
     const margin = revenue && cost !== null ? (revenue - cost) / revenue : null;
+    const sub = ws.data.subscriptions.find((s) => s.accountId === acc.id);
     const overdue = a.receivables.overdue.filter((s) => s.invoice.accountId === acc.id).reduce((s, x) => s + x.outstanding, 0);
-    const risks = a.signals.filter((s) => s.accountId === acc.id && s.polarity === "risk" && !s.autoResolved && s.review.status !== "dismissed" && s.review.status !== "resolved");
     const renewal = a.renewals.find((r) => r.accountId === acc.id);
+    const renewalDays = renewal ? daysBetween(today, renewal.renewalDate) : null;
+    const renewalRisk = own.some((i) => i.kind === "relationship");
     const budget = ws.data.projects.filter((p) => p.accountId === acc.id && p.billing === "internal").reduce((s, p) => s + (p.budgetCost ?? 0), 0);
-    return { acc, h, delta: h?.score !== null && h?.score !== undefined && prev !== null && prev !== undefined ? h.score - prev : null, projects, revenue, margin, overdue, risks, renewal, sub, budget };
+    const urgent = own.filter((i) => i.severity === "critical" || i.severity === "high");
+    return { acc, it, own, urgent, projects, revenue, margin, sub, overdue, renewal, renewalDays, renewalRisk, budget };
   });
 
+  const inView = (r: (typeof rows)[number], vw: View | null) =>
+    vw === "mine"
+      ? r.acc.ownerId === ws.user.id
+      : vw === "attention"
+        ? r.own.length > 0 || r.it.overall === "at_risk"
+        : vw === "renewals"
+          ? r.renewalDays !== null && r.renewalDays <= RENEWAL_WINDOW_DAYS
+          : vw === "overdue"
+            ? r.overdue > 0
+            : true;
+  const STATUS_RANK = { at_risk: 0, watch: 1, unknown: 2, good: 3, restricted: 4, none: 5 } as const;
+
   const filtered = rows
+    .filter((r) => inView(r, view))
     .filter((r) => !q || r.acc.name.toLowerCase().includes(q) || r.acc.aliases.some((x) => x.toLowerCase().includes(q)) || r.acc.industry.toLowerCase().includes(q))
-    .filter((r) => (status === "all" ? true : status === "risk" ? r.h?.status === "at_risk" || r.h?.status === "watch" : r.h?.status === status))
+    .filter((r) => (status === "all" ? true : status === "risk" ? r.it.overall === "at_risk" || r.it.overall === "watch" : r.it.overall === status))
     .filter((r) => (owner === "all" ? true : r.acc.ownerId === owner))
     .sort((x, y) => {
       if (sort === "name") return x.acc.name.localeCompare(y.acc.name);
       if (sort === "revenue") return (y.revenue ?? y.sub?.mrr ?? 0) - (x.revenue ?? x.sub?.mrr ?? 0);
       if (sort === "renewal") return (x.renewal?.renewalDate ?? "9999").localeCompare(y.renewal?.renewalDate ?? "9999");
-      return (x.h?.status === "insufficient" ? -1 : x.h?.score ?? 101) - (y.h?.status === "insufficient" ? -1 : y.h?.score ?? 101);
+      if (sort === "overdue") return y.overdue - x.overdue;
+      return STATUS_RANK[x.it.overall] - STATUS_RANK[y.it.overall] || y.urgent.length - x.urgent.length || y.own.length - x.own.length || x.acc.name.localeCompare(y.acc.name);
     });
   const owners = [...new Set(ws.data.accounts.map((x) => x.ownerId))];
-  const mode = ws.profile.modules.financeMode;
+  const ownsAny = rows.some((r) => r.acc.ownerId === ws.user.id);
+
+  const presets = [
+    { label: "All", href: "/accounts", active: !view, count: rows.length },
+    ...(ws.caps.allAccounts && ownsAny ? [{ label: `My ${t.accounts.toLowerCase()}`, href: "/accounts?view=mine", active: view === "mine", count: rows.filter((r) => inView(r, "mine")).length }] : []),
+    { label: "Needs attention", href: "/accounts?view=attention", active: view === "attention", count: rows.filter((r) => inView(r, "attention")).length },
+    ...(mode !== "budget" ? [{ label: "Renewals soon", href: "/accounts?view=renewals", active: view === "renewals", count: rows.filter((r) => inView(r, "renewals")).length }] : []),
+    ...(showOverdue ? [{ label: "Overdue collections", href: "/accounts?view=overdue", active: view === "overdue", count: rows.filter((r) => inView(r, "overdue")).length }] : []),
+  ];
+  const filtersActive = q || status !== "all" || owner !== "all";
+  const renewalText = (r: (typeof rows)[number]) => (r.renewal && r.renewalDays !== null ? `${fmtDate(r.renewal.renewalDate)} · in ${r.renewalDays} days` : null);
+  const money = (n: number | null) => v.money(n, { compact: true });
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={t.accounts} subtitle={`${ws.data.accounts.length} ${t.accounts.toLowerCase()}. Health is a transparent weighted score; open any ${t.account.toLowerCase()} to see the factors behind it.`} />
-      <form className="card flex flex-wrap items-end gap-3 p-3" role="search" aria-label={`Filter ${t.accounts.toLowerCase()}`}>
+    <div className="space-y-5">
+      <PageHeader eyebrow={aggregateScope(ws.caps)} title={t.accounts} subtitle={`Status is judged per dimension; open a ${t.account.toLowerCase()} to see why.`} />
+      <Presets label={`${t.accounts} views`} items={presets} />
+      <FilterForm label={`Filter ${t.accounts.toLowerCase()}`} defaults={{ sort: view === "renewals" ? "renewal" : "status" }}>
+        {view && <input type="hidden" name="view" value={view} />}
         <div className="min-w-[200px] flex-1">
-          <label className="label" htmlFor="q">Search</label>
-          <input id="q" name="q" className="input" defaultValue={q} placeholder="Name, alias or industry" />
+          <label className="label" htmlFor="q">
+            Search
+          </label>
+          <input id="q" name="q" type="search" className="input" defaultValue={q} placeholder="Name, alias or industry, then Enter" />
         </div>
         <div>
-          <label className="label" htmlFor="status">Health</label>
+          <label className="label" htmlFor="status">
+            Status
+          </label>
           <select id="status" name="status" className="input" defaultValue={status}>
             <option value="all">All</option>
             <option value="risk">At risk or watch</option>
             <option value="at_risk">At risk</option>
             <option value="watch">Watch</option>
-            <option value="healthy">Healthy</option>
-            <option value="insufficient">Insufficient data</option>
+            <option value="good">Good</option>
+            <option value="unknown">Not enough data</option>
           </select>
         </div>
+        {ws.caps.allAccounts && (
+          <div>
+            <label className="label" htmlFor="owner">
+              {t.owner}
+            </label>
+            <select id="owner" name="owner" className="input" defaultValue={owner}>
+              <option value="all">All</option>
+              {owners.map((o) => (
+                <option key={o} value={o}>
+                  {v.person(o)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
-          <label className="label" htmlFor="owner">{t.owner}</label>
-          <select id="owner" name="owner" className="input" defaultValue={owner}>
-            <option value="all">All</option>
-            {owners.map((o) => (
-              <option key={o} value={o}>
-                {v.person(o)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="sort">Sort by</label>
+          <label className="label" htmlFor="sort">
+            Sort by
+          </label>
           <select id="sort" name="sort" className="input" defaultValue={sort}>
-            <option value="health">Health (worst first)</option>
+            <option value="status">Status (worst first)</option>
             <option value="name">Name</option>
-            <option value="revenue">{mode === "subscription" ? "MRR" : "Revenue in period"}</option>
-            <option value="renewal">Next renewal</option>
+            {mode !== "budget" && ws.caps.viewProjectCosts && <option value="revenue">{mode === "subscription" ? "MRR" : "Revenue in period"}</option>}
+            {mode !== "budget" && <option value="renewal">Next renewal</option>}
+            {showOverdue && <option value="overdue">Overdue amount</option>}
           </select>
         </div>
-        <button className="btn btn-primary">Apply</button>
-        {(q || status !== "all" || owner !== "all" || sort !== "health") && (
-          <Link href="/accounts" className="btn">
-            Clear
+        <noscript>
+          <button className="btn btn-primary">Apply</button>
+        </noscript>
+        {filtersActive && (
+          <Link href={view ? `/accounts?view=${view}` : "/accounts"} className="btn">
+            Clear filters
           </Link>
         )}
-      </form>
+      </FilterForm>
 
-      <Card padded={false} title={`${filtered.length} of ${rows.length} shown`}>
+      <Card padded={false} title={`${filtered.length} of ${rows.length} shown`} subtitle={mode === "delivery" && ws.finance ? `Earned and margin: ${a.period.label}` : undefined}>
         {filtered.length === 0 ? (
           <div className="p-4">
-            <EmptyState title="No matches">Try clearing filters.</EmptyState>
+            <EmptyState title="No matches">{filtersActive ? "Try clearing filters." : `No ${t.accounts.toLowerCase()} in this view.`}</EmptyState>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead>
-                <tr>
-                  <th className="th">{t.account}</th>
-                  <th className="th">Health</th>
-                  <th className="th">{t.owner}</th>
-                  <th className="th num">Active {t.projects.toLowerCase()}</th>
-                  {mode === "delivery" && ws.finance && <th className="th num">Earned ({a.period.key === "quarter" ? "quarter" : "period"})</th>}
-                  {mode === "delivery" && ws.finance && <th className="th num">Delivery margin</th>}
-                  {mode === "subscription" && <th className="th num">MRR</th>}
-                  {mode === "subscription" && <th className="th num">Seat use</th>}
-                  {mode === "budget" && <th className="th num">Initiative budget</th>}
-                  {ws.profile.modules.invoices && (ws.caps.viewCompanyFinance || ws.caps.viewProjectCosts) && <th className="th num">Overdue</th>}
-                  <th className="th">Open risks</th>
-                  <th className="th">Renewal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => {
-                  const lastSeats = r.sub?.activeSeatsByMonth.at(-1);
-                  return (
-                    <tr key={r.acc.id} className="hover:bg-canvas/60">
-                      <td className="td min-w-[220px]">
-                        <div className="flex items-center gap-3">
-                          <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-canvas text-[11px] font-semibold text-ink-soft ring-1 ring-inset ring-line">
-                            {r.acc.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("")}
-                          </span>
-                          <div className="min-w-0">
-                            <Link href={`/accounts/${r.acc.id}`} className="font-medium">
-                              {r.acc.name}
-                            </Link>
-                            <div className="text-xs text-ink-muted">
-                              {r.acc.industry}
-                              {r.acc.segment ? ` · ${r.acc.segment}` : ""}
-                            </div>
+          <>
+            {/* Phones: one card per client with the situation first. */}
+            <ul className="divide-y divide-line md:hidden">
+              {filtered.map((r) => (
+                <li key={r.acc.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <Link href={`/accounts/${r.acc.id}`} className="font-medium">
+                      {r.acc.name}
+                    </Link>
+                    <LevelBadge level={r.it.overall}>{r.it.overallLabel}</LevelBadge>
+                  </div>
+                  <p className="mt-1 text-sm text-ink-soft">{r.own[0]?.title ?? r.it.headline}</p>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    {[
+                      v.person(r.acc.ownerId),
+                      r.own.length ? `${r.own.length} open issue${r.own.length === 1 ? "" : "s"}` : null,
+                      showOverdue && r.overdue > 0 ? `${money(r.overdue)} overdue` : null,
+                      renewalText(r) ? `Renews ${renewalText(r)}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[860px]">
+                <thead>
+                  <tr>
+                    <th className="th">{t.account}</th>
+                    <th className="th">Status</th>
+                    <th className="th">Main issue</th>
+                    <th className="th">{t.owner}</th>
+                    {mode === "delivery" && ws.finance && <th className="th num">Earned</th>}
+                    {mode === "delivery" && ws.finance && <th className="th num">Delivery margin</th>}
+                    {mode === "subscription" && ws.caps.viewCommercialTerms && <th className="th num">MRR</th>}
+                    {mode === "subscription" && <th className="th num">Seat use</th>}
+                    {mode === "budget" && ws.caps.viewProjectCosts && <th className="th num">Initiative budget</th>}
+                    {showOverdue && <th className="th num">Overdue</th>}
+                    {mode !== "budget" && <th className="th">Renewal</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => {
+                    const lastSeats = r.sub?.activeSeatsByMonth.at(-1);
+                    return (
+                      <tr key={r.acc.id} className="hover:bg-canvas/60">
+                        <td className="td min-w-[180px]">
+                          <Link href={`/accounts/${r.acc.id}`} className="font-medium">
+                            {r.acc.name}
+                          </Link>
+                          <div className="text-xs text-ink-muted">
+                            {r.acc.industry}
+                            {r.acc.segment ? ` · ${r.acc.segment}` : ""}
+                            {` · ${r.projects.length} active ${(r.projects.length === 1 ? t.project : t.projects).toLowerCase()}`}
                           </div>
-                        </div>
-                      </td>
-                      <td className="td whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          {r.h && <HealthBadge status={r.h.status} score={r.h.score} />}
-                          <Trend delta={r.delta} />
-                        </div>
-                      </td>
-                      <td className="td whitespace-nowrap">{v.person(r.acc.ownerId)}</td>
-                      <td className="td num">{r.projects.length}</td>
-                      {mode === "delivery" && ws.finance && <td className="td num">{v.money(r.revenue, { compact: true })}</td>}
-                      {mode === "delivery" && ws.finance && <td className={`td num ${r.margin !== null && r.margin < 0.3 ? "text-bad" : ""}`}>{fmtPct(r.margin)}</td>}
-                      {mode === "subscription" && <td className="td num">{r.sub ? v.money(r.sub.mrr) : "—"}</td>}
-                      {mode === "subscription" && <td className="td num">{r.sub ? (lastSeats === null || lastSeats === undefined ? <span className="text-ink-muted">no data</span> : `${lastSeats}/${r.sub.seats}`) : "—"}</td>}
-                      {mode === "budget" && <td className="td num">{v.money(r.budget, { compact: true })}</td>}
-                      {ws.profile.modules.invoices && (ws.caps.viewCompanyFinance || ws.caps.viewProjectCosts) && <td className={`td num ${r.overdue > 0 ? "text-warn" : ""}`}>{r.overdue > 0 ? v.money(r.overdue, { compact: true }) : "—"}</td>}
-                      <td className="td min-w-[180px]">
-                        {r.risks.length ? (
-                          <div className="flex flex-wrap gap-1" title={r.risks.map((s) => CATEGORY_LABEL[s.category]).join(", ")}>
-                            {r.risks.slice(0, 2).map((s) => (
-                              <Badge key={s.id} tone={s.severity === "critical" || s.severity === "high" ? "bad" : "warn"}>
-                                {CATEGORY_LABEL[s.category]}
-                              </Badge>
-                            ))}
-                            {r.risks.length > 2 && <Badge>+{r.risks.length - 2}</Badge>}
-                          </div>
-                        ) : (
-                          <span className="text-ink-faint">None</span>
+                        </td>
+                        <td className="td whitespace-nowrap">
+                          <LevelBadge level={r.it.overall}>{r.it.overallLabel}</LevelBadge>
+                        </td>
+                        <td className="td min-w-[220px] text-sm">
+                          {r.own[0] ? (
+                            <>
+                              <Link href={`/issues#${r.own[0].id}`} className="text-ink hover:text-accent">
+                                {r.own[0].title}
+                              </Link>
+                              {r.own.length > 1 && <span className="text-xs text-ink-muted"> +{r.own.length - 1} more</span>}
+                            </>
+                          ) : (
+                            <span className="text-ink-muted">{r.it.overall === "good" ? "None open" : r.it.overall === "unknown" ? "Not enough data to judge" : r.it.headline}</span>
+                          )}
+                        </td>
+                        <td className="td whitespace-nowrap">{v.person(r.acc.ownerId)}</td>
+                        {mode === "delivery" && ws.finance && <td className="td num">{money(r.revenue)}</td>}
+                        {mode === "delivery" && ws.finance && <td className={`td num ${r.margin !== null && r.margin < 0 ? "text-bad" : ""}`}>{fmtPct(r.margin)}</td>}
+                        {mode === "subscription" && ws.caps.viewCommercialTerms && <td className="td num">{r.sub ? v.money(r.sub.mrr) : "—"}</td>}
+                        {mode === "subscription" && <td className="td num">{r.sub ? lastSeats === null || lastSeats === undefined ? <span className="text-ink-muted">No data</span> : `${lastSeats} of ${r.sub.seats}` : "—"}</td>}
+                        {mode === "budget" && ws.caps.viewProjectCosts && <td className="td num">{money(r.budget)}</td>}
+                        {showOverdue && <td className={`td num ${r.overdue > 0 ? "text-warn" : ""}`}>{r.overdue > 0 ? money(r.overdue) : "—"}</td>}
+                        {mode !== "budget" && (
+                          <td className="td whitespace-nowrap text-sm">
+                            {r.renewal && r.renewalDays !== null ? (
+                              <>
+                                {fmtDate(r.renewal.renewalDate)}
+                                <div className={`text-xs ${r.renewalRisk && r.renewalDays <= RENEWAL_WINDOW_DAYS ? "font-medium text-bad" : "text-ink-muted"}`}>
+                                  in {r.renewalDays} days{r.renewalRisk && r.renewalDays <= RENEWAL_WINDOW_DAYS ? " · at risk" : ""}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-ink-faint">—</span>
+                            )}
+                          </td>
                         )}
-                      </td>
-                      <td className="td whitespace-nowrap">{r.renewal ? fmtDate(r.renewal.renewalDate) : <span className="text-ink-faint">—</span>}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
+      {mode === "delivery" && ws.finance && (
+        <p className="hidden text-xs text-ink-muted md:block">Earned revenue and delivery margin are for {a.period.label}, before overhead. Delivery margin covers direct labor, contractors and project expenses only.</p>
+      )}
     </div>
   );
 }

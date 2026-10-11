@@ -111,7 +111,7 @@ export default async function SignalPage({ params }: { params: Promise<{ id: str
           <Card title="Review">
             <SignalReviewControls signalId={s.id} status={s.review.status} canReview={ws.caps.reviewSignals} />
           </Card>
-          <Card title="Actions">
+          <Card title="Plans">
             {existing.length > 0 && (
               <ul className="mb-3 space-y-1 text-sm">
                 {existing.map((a) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Calculator, FolderKanban, LayoutDashboard, type LucideIcon, Menu, MessagesSquare, Newspaper, Plug, Radar, Settings, SquareCheckBig, Users, Wallet, X } from "lucide-react";
+import { BadgeDollarSign, Building2, Calculator, CircleAlert, FolderKanban, House, LayoutDashboard, type LucideIcon, Menu, MessagesSquare, Plug, Radar, Settings, ShieldCheck, SquareCheckBig, Users, Wallet, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
@@ -9,30 +9,40 @@ export interface NavItem {
   href: string;
   label: string;
   badge?: number;
+  /** Spoken in place of the bare number, e.g. "3 urgent". */
+  badgeLabel?: string;
   hidden?: boolean;
 }
 
 const ICONS: Record<string, LucideIcon> = {
-  "/": LayoutDashboard,
+  "/": House,
+  "/issues": CircleAlert,
   "/accounts": Building2,
   "/projects": FolderKanban,
   "/finance": Wallet,
   "/team": Users,
+  "/team/rates": BadgeDollarSign,
+  "/admin": ShieldCheck,
   "/signals": Radar,
   "/actions": SquareCheckBig,
-  "/briefing": Newspaper,
   "/communications": MessagesSquare,
   "/integrations": Plug,
   "/settings": Settings,
   "/calculations": Calculator,
 };
 
+/** Top level: Home, My work, Clients, Delivery, Finance, Administration. Every older URL still resolves. */
 const GROUPS: { label: string | null; hrefs: string[] }[] = [
-  { label: null, hrefs: ["/", "/briefing", "/actions"] },
-  { label: "Business", hrefs: ["/accounts", "/projects", "/finance", "/team"] },
-  { label: "Intelligence", hrefs: ["/signals", "/communications"] },
-  { label: "Workspace", hrefs: ["/integrations", "/settings", "/calculations"] },
+  { label: null, hrefs: ["/"] },
+  { label: "My work", hrefs: ["/issues", "/actions"] },
+  { label: "Clients", hrefs: ["/accounts", "/signals", "/communications"] },
+  { label: "Delivery", hrefs: ["/projects", "/team", "/team/rates"] },
+  { label: "Finance", hrefs: ["/finance"] },
+  { label: "Administration", hrefs: ["/admin", "/integrations", "/settings", "/calculations"] },
 ];
+
+/** Paths that belong to a nav item without sharing its prefix. */
+const ALSO_ACTIVE: Record<string, string[]> = { "/": ["/briefing"] };
 
 function initials(name: string) {
   return name
@@ -46,7 +56,14 @@ function initials(name: string) {
 export function Nav({ items, orgName, profileLabel, controls }: { items: NavItem[]; orgName: string; profileLabel: string; controls?: ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
-  const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const hrefs = items.filter((i) => !i.hidden).map((i) => i.href);
+  // The most specific matching item wins, so /team/rates does not also light up /team.
+  const isActive = (href: string) => {
+    if ((ALSO_ACTIVE[href] ?? []).some((p) => path.startsWith(p))) return true;
+    if (href === "/") return path === "/";
+    if (!(path === href || path.startsWith(`${href}/`))) return false;
+    return !hrefs.some((h) => h !== href && h.startsWith(`${href}/`) && (path === h || path.startsWith(`${h}/`)));
+  };
   const byHref = new Map(items.filter((i) => !i.hidden).map((i) => [i.href, i]));
 
   const list = (
@@ -72,7 +89,7 @@ export function Nav({ items, orgName, profileLabel, controls }: { items: NavItem
                       <Icon aria-hidden="true" size={17} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-white" : "text-sidebar-text/80 group-hover:text-white"} />
                       <span className="flex-1 truncate">{i.label}</span>
                       {i.badge ? (
-                        <span className="min-w-[20px] rounded-full bg-bad px-1.5 py-px text-center text-[10.5px] font-semibold text-white" aria-label={`${i.badge} items`}>
+                        <span className="min-w-[20px] rounded-full bg-bad px-1.5 py-px text-center text-[10.5px] font-semibold text-white" aria-label={i.badgeLabel ?? `${i.badge} items`}>
                           {i.badge}
                         </span>
                       ) : null}
