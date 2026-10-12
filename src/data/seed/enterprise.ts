@@ -139,6 +139,6 @@ export function buildEnterprise(): Dataset {
 
   return {
     org, businessUnits, people, compensation, billRates: [], timeOff: [], accounts, contracts: [], projects, milestones, tasks, timeEntries, expenses,
-    invoices: [], payments: [], subscriptions: [], threads, actions, connectors, mappings: [], opportunitySeeds: {},
+    invoices: [], payments: [], subscriptions: [], mediaFlights: [], retailLaunches: [], threads, actions, connectors, mappings: [], opportunitySeeds: {},
   };
 }

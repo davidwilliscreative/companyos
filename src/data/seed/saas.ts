@@ -191,7 +191,7 @@ export function buildSaas(): Dataset {
       { id: "sx_platform_vendor", orgId: ORG, projectId: "si_platform", date: "2026-06-15", category: "Vendor", description: "Migration tooling licence", amount: 14_000, currency: "USD", source: src("accounting", "expenses") },
       { id: "sx_sso_pen", orgId: ORG, projectId: "si_sso", date: "2026-09-20", category: "Vendor", description: "Penetration test deposit", amount: 6_000, currency: "USD", source: src("accounting", "expenses") },
     ],
-    invoices, payments, subscriptions, threads, actions, connectors, mappings: [],
+    invoices, payments, subscriptions, mediaFlights: [], retailLaunches: [], threads, actions, connectors, mappings: [],
     opportunitySeeds: {},
   };
 }

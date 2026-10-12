@@ -16,6 +16,7 @@ export const ISSUE_KIND_LABEL: Record<IssueKind, string> = {
   collections: "Collections",
   margin: "Margin",
   budget: "Budget",
+  media: "Media pacing",
   data: "Missing data",
   opportunity: "Opportunity",
   system: "Data source",

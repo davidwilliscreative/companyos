@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeDollarSign, Building2, Gauge, Calculator, CircleAlert, FolderKanban, House, LayoutDashboard, type LucideIcon, Menu, MessagesSquare, Plug, Radar, Settings, ShieldCheck, SquareCheckBig, Users, Wallet, X } from "lucide-react";
+import { BadgeDollarSign, Building2, Gauge, Calculator, CircleAlert, FolderKanban, House, LayoutDashboard, type LucideIcon, Menu, MessagesSquare, Package, Plug, Radar, Settings, ShieldCheck, SquareCheckBig, TrendingUp, Users, Wallet, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "./Logo";
@@ -20,6 +20,8 @@ const ICONS: Record<string, LucideIcon> = {
   "/issues": CircleAlert,
   "/accounts": Building2,
   "/department": Gauge,
+  "/launches": Package,
+  "/media": TrendingUp,
   "/projects": FolderKanban,
   "/finance": Wallet,
   "/team": Users,
@@ -38,7 +40,7 @@ const GROUPS: { label: string | null; hrefs: string[] }[] = [
   { label: null, hrefs: ["/"] },
   { label: "My work", hrefs: ["/issues", "/actions"] },
   { label: "Clients", hrefs: ["/accounts", "/signals", "/communications"] },
-  { label: "Delivery", hrefs: ["/department", "/projects", "/team", "/team/rates"] },
+  { label: "Delivery", hrefs: ["/department", "/launches", "/media", "/projects", "/team", "/team/rates"] },
   { label: "Finance", hrefs: ["/finance"] },
   { label: "Administration", hrefs: ["/admin", "/integrations", "/settings", "/calculations"] },
 ];

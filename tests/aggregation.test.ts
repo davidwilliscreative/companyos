@@ -4,7 +4,7 @@ import { emptyOverlay } from "@/data/state";
 import { AGING_BUCKETS, cashForecast, monthlySeries, periodSummary, receivables, reportingPeriods, revenueConcentration } from "@/lib/calc/company";
 import { ws } from "./helpers";
 
-describe.each(["agency", "saas", "enterprise"] as const)("%s totals reconcile", (profile) => {
+describe.each(["agency", "cpg_branding", "media", "saas", "enterprise"] as const)("%s totals reconcile", (profile) => {
   const ds = buildDataset(profile, emptyOverlay());
   const periods = reportingPeriods(ds);
 

@@ -14,7 +14,7 @@ import { addDays, daysBetween, fmtDate } from "./dates";
  * docs/permissions-and-issues.md; keep the two in step.
  */
 
-export type IssueKind = "staffing" | "delivery" | "relationship" | "collections" | "margin" | "budget" | "data" | "opportunity" | "system" | "plan";
+export type IssueKind = "staffing" | "delivery" | "relationship" | "collections" | "margin" | "budget" | "media" | "data" | "opportunity" | "system" | "plan";
 
 export interface IssueImpact {
   /** What is measured. Impacts with different labels are never added together. */
@@ -99,7 +99,11 @@ function groupKeyOf(i: AttentionItem, ws: Workspace): string | null {
       return p ? `staff:${p.id}` : null;
     }
     case "schedule":
+    case "launch":
+      // A shelf-date risk and the milestone behind it are one delivery situation.
       return i.projectId ? `ms:${i.projectId}` : null;
+    case "pacing":
+      return i.projectId ? `media:${i.projectId}` : null;
     case "margin": {
       const p = ws.data.projects.find((x) => x.id === i.projectId);
       return p ? `${p.billing === "internal" ? "budget" : "margin"}:${p.id}` : null;
@@ -127,6 +131,7 @@ const ID_PREFIX: Record<string, string> = {
   rel: "iss_rel_",
   data: "iss_data_",
   opp: "iss_opp_",
+  media: "iss_media_",
 };
 const KIND_OF: Record<string, IssueKind> = {
   staff: "staffing",
@@ -137,6 +142,7 @@ const KIND_OF: Record<string, IssueKind> = {
   rel: "relationship",
   data: "data",
   opp: "opportunity",
+  media: "media",
 };
 
 /**
@@ -190,13 +196,13 @@ function keyRecords(kind: IssueKind, id: string, items: AttentionItem[], ws: Wor
     for (const l of i.links) {
       // Account and project links are too broad to identify a plan, except for account-level issues.
       if (l.type === "account" && !["relationship", "data", "opportunity"].includes(kind)) continue;
-      if (l.type === "project" && kind !== "delivery") continue;
+      if (l.type === "project" && kind !== "delivery" && kind !== "media") continue;
       if (l.type === "invoice" && kind !== "collections") continue;
       // A relationship plan is about the client conversation, not the delivery records behind the health score.
       if (kind === "relationship" && !["account", "signal", "thread", "message"].includes(l.type)) continue;
       keys.add(linkKey(l));
     }
-    if (kind === "delivery") add("project", i.projectId);
+    if (kind === "delivery" || kind === "media") add("project", i.projectId);
     if (kind === "staffing") for (const t of ws.data.tasks.filter((t) => i.links.some((l) => l.type === "person" && l.id === t.assigneeId) && t.status === "blocked")) add("task", t.id);
   }
   if (kind === "relationship") for (const s of ws.analysis.signals.filter((s) => items.some((i) => i.accountId === s.accountId) && s.polarity === "risk")) for (const e of s.evidence) add("thread", e.threadId);
@@ -365,12 +371,21 @@ function describe(kind: IssueKind, key: string, items: AttentionItem[], ws: Work
       case "delivery": {
         const p = proj(id);
         const rest = items.filter((i) => i !== top);
+        const launch = items.find((i) => i.kind === "launch");
+        if (launch && launch.impactValue !== null)
+          impacts.push(
+            launch.impactValue > 0
+              ? { label: "Days past the print deadline", unit: "days", value: launch.impactValue, basis: "Forecast release of final files against the shelf date minus the print lead time" }
+              : { label: "Buffer before the print deadline", unit: "days", value: -launch.impactValue, basis: "Days between the forecast release of final files and the printer's deadline" },
+          );
         slipImpact();
         billingImpact();
         return {
           title: `${p?.name ?? term.project}: ${stripProjectPrefix(top.title, p?.name)}${rest.length ? `; ${rest.length} more milestone${rest.length === 1 ? "" : "s"} affected` : ""}`,
           what: sentence(`${sentence(top.why)}${rest.length ? ` Also: ${rest.map((i) => stripProjectPrefix(i.title, p?.name)).join("; ")}` : ""}`),
-          why: p
+          why: launch
+            ? `Retail shelf dates do not move: if final files miss the printer's deadline the launch slips to the retailer's next reset${billing.length ? ", and milestone billing waits too" : ""}.`
+            : p
             ? `${term.project} now due ${fmtDate(p.currentEndDate)}${p.currentEndDate !== p.originalEndDate ? `, ${daysBetween(p.originalEndDate, p.currentEndDate)} days later than agreed` : ""}${billing.length ? "; billing for these milestones waits until they complete" : ""}.`
             : "Delivery is behind plan.",
           next: top.next,
@@ -473,6 +488,27 @@ function describe(kind: IssueKind, key: string, items: AttentionItem[], ws: Work
                 ? "At this forecast the work costs more than it earns; the gap grows with every week of delay."
                 : "Profit at completion is below the target for this work."
               : "The overrun needs funding, a scope cut or re-phasing.",
+          next: top.next,
+          ownerId: top.ownerId,
+        };
+      }
+      case "media": {
+        const p = proj(id);
+        const a = acc(p?.accountId);
+        const spend = items.filter((i) => i.impactValue !== null);
+        const over = spend.filter((i) => i.impactLabel === "Projected client overspend");
+        const under = spend.filter((i) => i.impactLabel !== "Projected client overspend");
+        if (over.length) impacts.push({ label: "Projected client overspend", unit: "money", value: over.reduce((s, i) => s + (i.impactValue ?? 0), 0), basis: `${over.length} flight${over.length === 1 ? "" : "s"}; spend at the current run rate against the approved budget` });
+        if (under.length) impacts.push({ label: "Client budget projected to go unspent", unit: "money", value: under.reduce((s, i) => s + (i.impactValue ?? 0), 0), basis: `${under.length} flight${under.length === 1 ? "" : "s"}; approved budget minus spend at the current run rate` });
+        impacts.push({ label: "Flights needing action", unit: "count", value: items.length, basis: "Off pace, behind on KPI, or without recent reporting" });
+        return {
+          title: items.length === 1 ? `${a?.name ?? term.account}: ${top.title}` : `${a?.name ?? term.account}: ${items.length} media flights need action`,
+          what: sentence(items.map((i) => (items.length === 1 ? i.why : `${i.title}. ${i.why}`)).join(" ")),
+          why: over.length
+            ? "Spend beyond the approved budget is the agency's liability unless the client signs it off, and it is hard to claw back once delivered."
+            : under.length
+              ? "Unspent budget means fewer results than the plan promised, and fees tied to spend fall with it."
+              : "Clients judge the media program on these KPIs; a sustained miss puts the relationship and the renewal at risk.",
           next: top.next,
           ownerId: top.ownerId,
         };

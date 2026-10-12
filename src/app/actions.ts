@@ -11,6 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import type { ScenarioInputs } from "@/lib/calc/scenario";
 import type { ColumnMapping, SheetDatasetKey } from "@/lib/connectors/sheets";
 import { isRole } from "@/lib/permissions";
+import { isProfileId } from "@/domain/profiles";
 
 const YEAR = 60 * 60 * 24 * 365;
 
@@ -20,7 +21,7 @@ function done<T extends m.Result<unknown>>(r: T): T {
 }
 
 export async function setProfile(profile: ProfileId) {
-  if (!["agency", "saas", "enterprise"].includes(profile)) return;
+  if (!isProfileId(profile)) return;
   (await cookies()).set(COOKIE.profile, profile, { path: "/", maxAge: YEAR, sameSite: "lax" });
   revalidatePath("/", "layout");
 }

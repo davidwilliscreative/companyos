@@ -158,6 +158,9 @@ export function buildWorkspace(ctx: RequestContext, store: StateStore, opts: { c
     invoices: commercial ? full.invoices.filter(invoiceAllowed) : [],
     payments: commercial ? full.payments.filter((p) => full.invoices.some((i) => i.id === p.invoiceId && invoiceAllowed(i))) : [],
     subscriptions: commercial && !dept ? full.subscriptions.filter((s) => accountIds.has(s.accountId)) : [],
+    // Client media budgets and spend follow commercial terms; launches follow the projects they belong to.
+    mediaFlights: commercial ? full.mediaFlights.filter((f) => projectIds.has(f.projectId)) : [],
+    retailLaunches: full.retailLaunches.filter((l) => projectIds.has(l.projectId)),
     // Department heads see their own people's bill rates only.
     billRates: caps.viewProjectCosts ? (dept ? full.billRates.filter((r) => deptMemberIds.has(r.personId)) : full.billRates) : [],
     // Threads the role cannot read are dropped entirely, including metadata.
@@ -220,6 +223,7 @@ export function buildWorkspace(ctx: RequestContext, store: StateStore, opts: { c
       .map((i) => {
         let item = { ...i, links: i.links.filter(linkAllowed) };
         if (!commercial && i.impactValue !== null && ["renewal", "schedule", "opportunity"].includes(i.kind)) item = { ...item, impactValue: null, impactLabel: i.kind === "renewal" ? "Contract value restricted for your role" : i.kind === "opportunity" ? "Estimate restricted for your role" : "Schedule" };
+        if (!commercial && i.kind === "pacing") item = { ...item, impactValue: null, why: "Media spend and results are restricted for your role." };
         if (!commercial && i.kind === "action") item = { ...item, impactLabel: redactImpact(i.impactLabel) };
         if (i.kind === "capacity" && !all) {
           // Name only permitted projects; everything else is "other work".
@@ -241,6 +245,8 @@ export function buildWorkspace(ctx: RequestContext, store: StateStore, opts: { c
       }),
     renewals: analysis.renewals.filter((r) => accountIds.has(r.accountId) && (!dept || contractIds.has(r.contractId))).map((r) => (commercial ? r : { ...r, annualValue: null })),
     capacity: scopeCapacity(analysis.capacity, projectIds, dept ? deptMemberIds : null),
+    media: commercial ? Object.fromEntries(Object.entries(analysis.media).filter(([, p]) => projectIds.has(p.flight.projectId))) : {},
+    launches: Object.fromEntries(Object.entries(analysis.launches).filter(([, r]) => projectIds.has(r.launch.projectId))),
   };
 
   // ---- Compensation (restricted) ----

@@ -13,7 +13,7 @@ export type ISODate = string;
 /** Date-time, YYYY-MM-DDTHH:mm:ssZ. */
 export type ISODateTime = string;
 export type CurrencyCode = "USD" | "EUR" | "GBP";
-export type ProfileId = "agency" | "saas" | "enterprise";
+export type ProfileId = "agency" | "cpg_branding" | "media" | "saas" | "enterprise";
 export type RoleId = "executive" | "finance" | "account_owner" | "department_head" | "admin";
 
 /** Where a record came from. Every record carries provenance. */
@@ -454,7 +454,7 @@ export interface Action {
   origin: "seed" | "user" | "signal" | "alert" | "opportunity";
 }
 
-export type ConnectorKind = "project_management" | "communications" | "finance" | "crm" | "people" | "spreadsheet";
+export type ConnectorKind = "project_management" | "communications" | "finance" | "advertising" | "crm" | "people" | "spreadsheet";
 
 export interface ConnectorStatus {
   id: ID;
@@ -487,6 +487,53 @@ export interface EntityMapping {
   reason: string;
 }
 
+/**
+ * Media profile: one channel line of a client's media plan, with the spend and results the ad
+ * platform reported each week. Media budgets are the client's money (billed at cost, outside agency
+ * revenue); the agency is paid its management fee and studio work through ordinary contracts.
+ */
+export interface MediaFlight {
+  id: ID;
+  orgId: ID;
+  accountId: ID;
+  /** The engagement that runs this flight (usually the media management retainer). */
+  projectId: ID;
+  channel: string;
+  platform: string;
+  objective: string;
+  start: ISODate;
+  end: ISODate;
+  /** Planned client media budget for the whole flight. */
+  budget: number;
+  currency: CurrencyCode;
+  kpi: { metric: "CPA" | "ROAS"; target: number };
+  /** Platform-reported delivery, one row per completed week (dated to the Monday). */
+  weeks: { week: ISODate; spend: number; conversions: number; revenue: number }[];
+  ownerId: ID;
+  note?: string;
+  source: Provenance;
+}
+
+/**
+ * CPG branding profile: a packaging launch that has to be on shelf at a retailer by a set date.
+ * Final files must reach the printer `printLeadWeeks` before the shelf date; the release
+ * milestone is the agency's "final artwork released to print" step.
+ */
+export interface RetailLaunch {
+  id: ID;
+  orgId: ID;
+  accountId: ID;
+  projectId: ID;
+  name: string;
+  retailers: string[];
+  skus: number;
+  shelfDate: ISODate;
+  printLeadWeeks: number;
+  releaseMilestoneId: ID;
+  printer: string;
+  source: Provenance;
+}
+
 export interface Dataset {
   org: Organization;
   businessUnits: BusinessUnit[];
@@ -504,6 +551,8 @@ export interface Dataset {
   invoices: Invoice[];
   payments: Payment[];
   subscriptions: Subscription[];
+  mediaFlights: MediaFlight[];
+  retailLaunches: RetailLaunch[];
   threads: Thread[];
   actions: Action[];
   connectors: ConnectorStatus[];

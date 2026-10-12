@@ -105,6 +105,13 @@ export function normalizeCurrency(ds: Dataset, target: CurrencyCode): Dataset {
     currency: target,
   }));
   ds.subscriptions = ds.subscriptions.map((s) => ({ ...s, mrr: c(s.mrr, s.currency), currency: target }));
+  ds.mediaFlights = ds.mediaFlights.map((f) => ({
+    ...f,
+    budget: c(f.budget, f.currency),
+    kpi: f.kpi.metric === "CPA" ? { ...f.kpi, target: c(f.kpi.target, f.currency) } : f.kpi,
+    weeks: f.weeks.map((w) => ({ ...w, spend: c(w.spend, f.currency), revenue: c(w.revenue, f.currency) })),
+    currency: target,
+  }));
   ds.projects = ds.projects.map((p) => ({
     ...p,
     budgetCost: p.budgetCost === undefined ? undefined : c(p.budgetCost, "USD"),

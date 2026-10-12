@@ -4,6 +4,8 @@ import { addDays, daysBetween, fmtDate } from "@/lib/dates";
 import { invoiceStatus } from "./company";
 import { earnedRevenue, measurementStart, milestoneState, projectCosts, projectFinancials } from "./finance";
 import { indexOf } from "./index";
+import { launchReadiness } from "./launch";
+import { flightPacing } from "./media";
 
 /**
  * Account health is a transparent weighted score. Each component returns a
@@ -51,6 +53,17 @@ function deliveryComponent(ds: Dataset, account: Account, asOf: ISODate): Omit<H
   if (!projects.length) return { score: null, factors: [], note: "No active work" };
   let score = 100;
   const factors: HealthFactor[] = [];
+  // Retail shelf dates: a launch whose final files will miss the printer's deadline weighs more than a slipped milestone.
+  for (const l of ds.retailLaunches.filter((x) => x.accountId === account.id)) {
+    const r = launchReadiness(ds, l, asOf);
+    if (r.status === "at_risk" && r.milestoneState !== "done") {
+      score -= 20;
+      factors.push({ label: `${l.name}: final files forecast ${-(r.bufferDays ?? 0)} days after the print deadline for the ${fmtDate(l.shelfDate)} shelf date`, effect: -20, kind: "calculated", link: { type: "project", id: l.projectId } });
+    } else if (r.status === "tight") {
+      score -= 8;
+      factors.push({ label: `${l.name}: ${r.bufferDays ?? 0} days of buffer before the print deadline`, effect: -8, kind: "calculated", link: { type: "project", id: l.projectId } });
+    }
+  }
   for (const p of projects) {
     for (const m of idx.milestonesByProject.get(p.id) ?? []) {
       if (m.originalDue > addDays(asOf, 60) && !m.dueChanges.length) continue;
@@ -112,6 +125,35 @@ function financialComponent(ds: Dataset, account: Account, asOf: ISODate): Omit<
     }
   }
   if (!invoices.length && !factors.length) return { score: null, factors: [], note: "No invoices or revenue yet" };
+  return { score: clamp(score), factors };
+}
+
+/** Media profile: spend pacing and KPI results of the account's live flights. Not applicable when the client buys no media through us. */
+function mediaComponent(ds: Dataset, account: Account, asOf: ISODate): Omit<HealthComponent, "key" | "label" | "weight"> & { notApplicable?: boolean } {
+  const flights = ds.mediaFlights.filter((f) => f.accountId === account.id && f.start <= asOf && f.end >= addDays(asOf, -30));
+  if (!flights.length) return { score: null, factors: [], notApplicable: true };
+  let score = 100;
+  let measured = 0;
+  const factors: HealthFactor[] = [];
+  for (const f of flights) {
+    const p = flightPacing(f, asOf);
+    if (p.status === "no_data") {
+      factors.push({ label: `${f.channel} (${f.platform}): ${p.summary.toLowerCase()}`, effect: 0, kind: "observed", link: { type: "project", id: f.projectId } });
+      continue;
+    }
+    measured++;
+    if (p.status === "over" || p.status === "under") {
+      const pen = Math.min(25, Math.round(Math.abs(p.projectedVariance) * 100));
+      score -= pen;
+      factors.push({ label: `${f.channel} (${f.platform}) projected ${Math.round(Math.abs(p.projectedVariance) * 100)}% ${p.status === "over" ? "over" : "under"} budget`, effect: -pen, kind: "calculated", link: { type: "project", id: f.projectId } });
+    }
+    if (p.kpiStatus === "behind") {
+      const pen = Math.min(25, Math.round(-(p.kpiGap ?? 0) * 80));
+      score -= pen;
+      factors.push({ label: `${f.channel} (${f.platform}) ${f.kpi.metric} ${Math.round(-(p.kpiGap ?? 0) * 100)}% worse than target over the last 4 weeks`, effect: -pen, kind: "observed", link: { type: "project", id: f.projectId } });
+    } else if (p.kpiStatus === "ahead") factors.push({ label: `${f.channel} (${f.platform}) ${f.kpi.metric} ${Math.round((p.kpiGap ?? 0) * 100)}% better than target`, effect: 0, kind: "observed", link: { type: "project", id: f.projectId } });
+  }
+  if (!measured) return { score: null, factors, note: "No recent platform reporting" };
   return { score: clamp(score), factors };
 }
 
@@ -195,15 +237,17 @@ export function accountHealth(ds: Dataset, account: Account, signals: Signal[], 
   const profile = getProfile(ds.org.profileId);
   const lastContact = lastClientContact(ds, account.id, asOf);
   const hasComms = (indexOf(ds).threadsByAccount.get(account.id) ?? []).some((t) => t.messages.some((m) => m.sentAt.slice(0, 10) <= asOf && daysBetween(m.sentAt.slice(0, 10), asOf) <= 120));
-  const components: HealthComponent[] = profile.healthComponents.map((c) => {
-    const r =
-      c.key === "delivery" ? deliveryComponent(ds, account, asOf)
+  const components: HealthComponent[] = profile.healthComponents.flatMap((c) => {
+    const r: Omit<HealthComponent, "key" | "label" | "weight"> & { notApplicable?: boolean } =
+      c.key === "media" ? mediaComponent(ds, account, asOf)
+      : c.key === "delivery" ? deliveryComponent(ds, account, asOf)
       : c.key === "financial" ? financialComponent(ds, account, asOf)
       : c.key === "relationship" ? relationshipComponent(signals, account, hasComms)
       : c.key === "engagement" ? engagementComponent(lastContact, asOf)
       : c.key === "usage" ? usageComponent(ds, account)
       : budgetComponent(ds, account, asOf);
-    return { key: c.key, label: c.label, weight: c.weight, ...r };
+    if (r.notApplicable) return [];
+    return [{ key: c.key, label: c.label, weight: c.weight, score: r.score, factors: r.factors, ...(r.note ? { note: r.note } : {}) }];
   });
 
   const dataGaps: string[] = [];
@@ -219,7 +263,9 @@ export function accountHealth(ds: Dataset, account: Account, signals: Signal[], 
   const scored = components.filter((c) => c.score !== null);
   const wsum = scored.reduce((s, c) => s + c.weight, 0);
   const score = wsum > 0 ? Math.round(scored.reduce((s, c) => s + (c.score as number) * c.weight, 0) / wsum) : null;
-  const completeness = components.reduce((s, c) => s + (c.score === null ? 0 : c.weight), 0);
+  // Components that don't apply to this account (no media bought through us) are left out, not counted as missing.
+  const applicable = components.reduce((s, c) => s + c.weight, 0);
+  const completeness = applicable > 0 ? components.reduce((s, c) => s + (c.score === null ? 0 : c.weight), 0) / applicable : 0;
   let status: HealthStatus = score === null ? "insufficient" : score >= 75 ? "healthy" : score >= 55 ? "watch" : "at_risk";
   // A critical, unreviewed risk caps the status at "watch" even if other components are strong.
   const critical = signals.some((s) => s.accountId === account.id && s.severity === "critical" && s.polarity === "risk" && !s.autoResolved && s.review.status !== "dismissed");

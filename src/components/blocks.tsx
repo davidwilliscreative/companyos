@@ -37,6 +37,8 @@ const KIND_LABEL: Record<AttentionItem["kind"], string> = {
   renewal: "Renewal",
   margin: "Margin / budget",
   schedule: "Schedule",
+  launch: "Shelf date",
+  pacing: "Media pacing",
   invoice: "Receivable",
   capacity: "Capacity",
   opportunity: "Opportunity",
@@ -46,9 +48,16 @@ const KIND_LABEL: Record<AttentionItem["kind"], string> = {
 
 const SEV_DOT: Record<AttentionItem["severity"], string> = { critical: "bg-bad ring-bad-line", high: "bg-bad/80 ring-bad-line", medium: "bg-warn ring-warn-line", low: "bg-ink-faint ring-line" };
 
+/** Attention impacts are money, except shelf-date risks, which are measured in days. */
+function impactText(v: ReturnType<typeof viewHelpers>, i: AttentionItem) {
+  if (i.impactValue === null) return "—";
+  if (i.kind === "launch") return i.impactValue > 0 ? `${i.impactValue} days late` : `${-i.impactValue} days spare`;
+  return v.money(i.impactValue, { compact: true });
+}
+
 function actionDefaults(ws: Workspace, i: AttentionItem) {
   const v = viewHelpers(ws);
-  return { title: i.next.length < 120 ? `${i.title}: ${i.next}`.slice(0, 160) : i.title, description: i.why, ownerId: i.ownerId, dueDate: i.dueDate < ws.org.demoDate ? addDays(ws.org.demoDate, 2) : i.dueDate, severity: i.severity, impact: i.impactValue !== null ? `${v.money(i.impactValue, { compact: true })} ${i.impactLabel.toLowerCase()}` : i.impactLabel, accountId: i.accountId, links: i.links, origin: "alert" as const };
+  return { title: i.next.length < 120 ? `${i.title}: ${i.next}`.slice(0, 160) : i.title, description: i.why, ownerId: i.ownerId, dueDate: i.dueDate < ws.org.demoDate ? addDays(ws.org.demoDate, 2) : i.dueDate, severity: i.severity, impact: i.impactValue !== null ? `${impactText(v, i)} ${i.impactLabel.toLowerCase()}` : i.impactLabel, accountId: i.accountId, links: i.links, origin: "alert" as const };
 }
 
 /** The single most important item, given visual weight so the page has an obvious starting point. */
@@ -75,7 +84,7 @@ export function FeaturedAttention({ ws, item: i }: { ws: Workspace; item: Attent
         <div className="mt-5 grid gap-px overflow-hidden rounded-xl bg-white/10 sm:grid-cols-3">
           <div className="bg-sidebar-soft px-4 py-3">
             <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-white/50">Impact</div>
-            <div className="mt-1 text-xl font-semibold tabular-nums tracking-tight">{i.impactValue !== null ? v.money(i.impactValue, { compact: true }) : "—"}</div>
+            <div className="mt-1 text-xl font-semibold tabular-nums tracking-tight">{impactText(v, i)}</div>
             <div className="text-xs text-white/50">{i.impactLabel}</div>
           </div>
           <div className="bg-sidebar-soft px-4 py-3">
@@ -132,7 +141,7 @@ export function AttentionRows({ ws, items, start = 1 }: { ws: Workspace; items: 
             <p className="mt-0.5 line-clamp-1 text-[13px] text-ink-muted">{i.why}</p>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-sm font-semibold tabular-nums text-ink">{i.impactValue !== null ? v.money(i.impactValue, { compact: true }) : "—"}</div>
+            <div className="text-sm font-semibold tabular-nums text-ink">{impactText(v, i)}</div>
             <div className={`text-xs ${i.dueDate <= addDays(ws.org.demoDate, 2) ? "font-medium text-bad" : "text-ink-muted"}`}>{relativeDays(ws.org.demoDate, i.dueDate)}</div>
           </div>
         </li>
@@ -176,7 +185,7 @@ export function AttentionList({ ws, items, limit, showCreate = true }: { ws: Wor
               <dl className="grid w-full shrink-0 grid-cols-3 gap-2 text-xs sm:w-56 sm:grid-cols-1 sm:gap-1">
                 <div>
                   <dt className="text-ink-muted">Impact</dt>
-                  <dd className="font-medium tabular-nums">{i.impactValue !== null ? v.money(i.impactValue, { compact: true }) : "—"}</dd>
+                  <dd className="font-medium tabular-nums">{impactText(v, i)}</dd>
                   <dd className="text-[11px] text-ink-muted">{i.impactLabel}</dd>
                 </div>
                 <div>

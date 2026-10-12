@@ -7,7 +7,7 @@ import { buildIssues } from "@/lib/issues";
 import { ACCOUNT_VIEWS, accountRows, inAccountView, inProjectView, PROJECT_VIEWS, parseView, projectRows, RENEWAL_WINDOW_DAYS } from "@/lib/views";
 import { ws } from "./helpers";
 
-const PROFILES: ProfileId[] = ["agency", "saas", "enterprise"];
+const PROFILES: ProfileId[] = ["agency", "cpg_branding", "media", "saas", "enterprise"];
 const ROLES: RoleId[] = ["executive", "finance", "account_owner", "department_head", "admin"];
 const APP = path.join(__dirname, "../src/app/(app)");
 const routeExists = (p: string) => fs.existsSync(path.join(APP, p === "/" ? "" : p, "page.tsx"));

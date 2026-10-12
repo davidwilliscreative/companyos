@@ -34,6 +34,7 @@ const AFFECTS: [RegExp, string][] = [
   [/time entr/i, "Hours, utilization and labor cost"],
   [/slack|email|thread|programme/i, "Relationship signals and health"],
   [/usage/i, "Product usage health"],
+  [/media spend|conversions/i, "Media pacing and KPI results"],
   [/subscription/i, "Recurring revenue and renewals"],
 ];
 
@@ -45,6 +46,7 @@ function affectsFor(c: ConnectorStatus): string[] {
 
 const KIND_NOUN: Record<ConnectorStatus["kind"], string> = {
   finance: "Accounting sync",
+  advertising: "Ad platform reporting",
   communications: "Message sync",
   project_management: "Project sync",
   spreadsheet: "Spreadsheet import",
