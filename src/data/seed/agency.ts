@@ -42,6 +42,11 @@ import {
  *  7. Overloaded team member across projects ........ Priya Shah
  *  8. Serious issue that has been resolved .......... Kestrel Outdoor (checkout outage)
  *  9. Stale / insufficient information .............. Lumen Analytics
+ *
+ * Department head example: Rosa Delgado, Head of Creative. The Creative department is
+ * design, content and copy (Aisha, Leo, Nina and the Ivy Chen and Studio Kite contractors).
+ * Its tasks carry revision rounds and its client threads include feedback that names people,
+ * which the department view scores (simulated) with links back to each message.
  */
 
 const ORG = "org_fieldwork";
@@ -73,7 +78,8 @@ export function buildAgency(): Dataset {
       { id: "svc_brand", name: "Brand strategy & identity", keywords: ["brand", "identity", "naming"] },
       { id: "svc_content", name: "Content & campaigns", keywords: ["campaign", "content", "social", "banners"] },
     ],
-    demoPersonas: { executive: "p_dana", finance: "p_marcus", account_owner: "p_sofia", admin: "p_ryan" },
+    demoPersonas: { executive: "p_dana", finance: "p_marcus", account_owner: "p_sofia", department_head: "p_rosa", admin: "p_ryan" },
+    departments: [{ name: "Creative", headId: "p_rosa" }],
   };
 
   const person = (id: string, name: string, title: string, role: string, department: string, startDate = "2023-01-09", type: Person["type"] = "employee", fte = 1): Person => ({
@@ -97,17 +103,18 @@ export function buildAgency(): Dataset {
     person("p_hannah", "Hannah Brooks", "Account Manager", "Account management", "Client Services", "2024-04-15"),
     person("p_priya", "Priya Shah", "Senior Developer", "Developer", "Engineering", "2021-08-02"),
     person("p_tom", "Tom Becker", "Developer", "Developer", "Engineering", "2023-03-06"),
-    person("p_aisha", "Aisha Rahman", "Lead Designer", "Designer", "Design", "2020-11-02"),
-    person("p_leo", "Leo Martins", "Designer", "Designer", "Design", "2024-01-08"),
+    person("p_rosa", "Rosa Delgado", "Head of Creative", "Department head", "Creative", "2022-03-07"),
+    person("p_aisha", "Aisha Rahman", "Lead Designer", "Designer", "Creative", "2020-11-02"),
+    person("p_leo", "Leo Martins", "Designer", "Designer", "Creative", "2024-01-08"),
     person("p_grace", "Grace Kim", "Senior Project Manager", "Project manager", "Delivery", "2022-05-09"),
     person("p_ben", "Ben Carter", "Project Manager", "Project manager", "Delivery", "2023-09-04"),
-    person("p_nina", "Nina Petrova", "Content Strategist", "Strategist", "Strategy", "2022-10-03"),
+    person("p_nina", "Nina Petrova", "Content Strategist", "Strategist", "Creative", "2022-10-03"),
     person("p_omar", "Omar Haddad", "Developer", "Developer", "Engineering", "2026-08-03"),
     person("p_chloe", "Chloe Dubois", "Strategy Lead", "Strategist", "Strategy", "2021-01-11"),
     person("p_ryan", "Ryan Walsh", "Systems & Operations Administrator", "Operations", "Operations", "2022-02-14"),
     { ...person("c_felix", "Felix Novak", "Freelance Developer", "Developer", "Engineering", "2026-05-25", "contractor"), email: "felix@novak.example" },
-    { ...person("c_ivy", "Ivy Chen", "Freelance Motion Designer", "Designer", "Design", "2026-03-02", "contractor", 0.5), email: "ivy@ivychen.example" },
-    { ...person("c_kite", "Studio Kite", "Copywriting partner (EU)", "Strategist", "Strategy", "2026-04-01", "contractor", 0.5), email: "hello@studiokite.example" },
+    { ...person("c_ivy", "Ivy Chen", "Freelance Motion Designer", "Designer", "Creative", "2026-03-02", "contractor", 0.5), email: "ivy@ivychen.example" },
+    { ...person("c_kite", "Studio Kite", "Copywriting partner (EU)", "Strategist", "Creative", "2026-04-01", "contractor", 0.5), email: "hello@studiokite.example" },
   ];
 
   // Compensation is a restricted dataset (finance & executive only).
@@ -120,6 +127,7 @@ export function buildAgency(): Dataset {
     comp(ORG, "p_hannah", "2026-01-01", 95_000, 18_000),
     comp(ORG, "p_priya", "2026-01-01", 145_000, 27_000),
     comp(ORG, "p_tom", "2026-01-01", 110_000, 21_000),
+    comp(ORG, "p_rosa", "2026-01-01", 150_000, 28_000),
     comp(ORG, "p_aisha", "2026-01-01", 130_000, 24_000),
     comp(ORG, "p_aisha", "2026-07-01", 138_000, 25_500),
     comp(ORG, "p_leo", "2026-01-01", 92_000, 17_000),
@@ -400,35 +408,47 @@ export function buildAgency(): Dataset {
     T({ id: "tk_harbor_qa", projectId: "pr_harbor_web", milestoneId: "ms_harbor_launch", title: "Cross-browser QA and accessibility pass", assigneeId: "p_leo", status: "todo", due: "2026-10-16", estimateHours: 40, dependsOn: ["tk_harbor_booking", "tk_harbor_props"] }),
     T({ id: "tk_harbor_gift", projectId: "pr_harbor_web", title: "Gift card page (requested Sep 29, unpriced)", assigneeId: "p_leo", status: "todo", due: "2026-10-23", estimateHours: 30, blockerNote: "Needs change order decision" }),
     T({ id: "tk_harbor_content", projectId: "pr_harbor_web", milestoneId: "ms_harbor_launch", title: "Content migration sign-off", assigneeId: "p_grace", status: "todo", due: "2026-10-20", estimateHours: 16 }),
+    T({ id: "tk_harbor_imagery", projectId: "pr_harbor_web", milestoneId: "ms_harbor_build", title: "Property imagery art direction (14 properties)", assigneeId: "p_aisha", status: "done", due: "2026-09-18", completedOn: "2026-09-18", estimateHours: 40, revisionRounds: 2 }),
 
     T({ id: "tk_meridian_contrast", projectId: "pr_meridian_portal", milestoneId: "ms_meridian_a11y", title: "Fix colour contrast on dashboard widgets", assigneeId: "p_tom", status: "in_progress", due: "2026-08-28", estimateHours: 24, blockerNote: "Reopened twice after client review" }),
     T({ id: "tk_meridian_focus", projectId: "pr_meridian_portal", milestoneId: "ms_meridian_a11y", title: "Keyboard focus order on appointment flow", assigneeId: "p_tom", status: "done", due: "2026-09-18", completedOn: "2026-09-24", estimateHours: 16 }),
     T({ id: "tk_meridian_forms", projectId: "pr_meridian_portal", milestoneId: "ms_meridian_forms", title: "Form validation patterns", assigneeId: "p_tom", status: "todo", due: "2026-10-09", estimateHours: 40, dependsOn: ["tk_meridian_contrast"] }),
     T({ id: "tk_meridian_status", projectId: "pr_meridian_portal", title: "Weekly written status report to client", assigneeId: "p_ben", status: "in_progress", due: "2026-10-09", estimateHours: 2 }),
+    T({ id: "tk_meridian_sep_articles", projectId: "pr_meridian_content", title: "September health articles (4)", assigneeId: "p_nina", status: "done", due: "2026-09-18", completedOn: "2026-09-25", estimateHours: 32, revisionRounds: 3 }),
+    T({ id: "tk_meridian_oct_articles", projectId: "pr_meridian_content", title: "October health articles (4)", assigneeId: "p_nina", status: "in_progress", due: "2026-10-16", estimateHours: 32, revisionRounds: 1 }),
+    T({ id: "tk_meridian_newsletter", projectId: "pr_meridian_content", title: "Newsletter template refresh", assigneeId: "c_kite", status: "todo", due: "2026-10-23", estimateHours: 12 }),
 
     T({ id: "tk_copper_routing", projectId: "pr_copper_app", milestoneId: "ms_copper_beta", title: "Routing API integration", assigneeId: "p_priya", status: "blocked", due: "2026-09-25", estimateHours: 60, blockerNote: "Waiting on Priya Shah (allocated to Harbor & Pine build)" }),
     T({ id: "tk_copper_offline", projectId: "pr_copper_app", milestoneId: "ms_copper_beta", title: "Offline mode for proof-of-delivery", assigneeId: "c_felix", status: "in_progress", due: "2026-10-02", estimateHours: 50 }),
     T({ id: "tk_copper_beta_qa", projectId: "pr_copper_app", milestoneId: "ms_copper_beta", title: "Beta QA with 20 drivers", assigneeId: "p_tom", status: "todo", due: "2026-10-09", estimateHours: 24, dependsOn: ["tk_copper_routing", "tk_copper_offline"] }),
+    T({ id: "tk_copper_shipper_copy", projectId: "pr_copper_growth", title: "Shipper campaign copy and ads", assigneeId: "c_kite", status: "done", due: "2026-09-18", completedOn: "2026-09-29", estimateHours: 20, revisionRounds: 3 }),
+    T({ id: "tk_copper_q4_visuals", projectId: "pr_copper_growth", title: "Q4 shipper campaign visuals", assigneeId: "p_leo", status: "todo", due: "2026-10-14", estimateHours: 24 }),
 
     T({ id: "tk_verdant_claims", projectId: "pr_verdant_launch", milestoneId: "ms_verdant_approval", title: "Client legal approval of health claims", assigneeId: "p_ben", status: "blocked", due: "2026-09-18", estimateHours: 2, blockerNote: "With Verdant legal since Aug 28" }),
     T({ id: "tk_verdant_media", projectId: "pr_verdant_launch", milestoneId: "ms_verdant_media", title: "Book launch media", assigneeId: "p_nina", status: "todo", due: "2026-10-16", estimateHours: 20, dependsOn: ["tk_verdant_claims"] }),
     T({ id: "tk_verdant_adapt", projectId: "pr_verdant_launch", milestoneId: "ms_verdant_media", title: "Adapt creative to 12 formats", assigneeId: "p_leo", status: "todo", due: "2026-10-23", estimateHours: 36, dependsOn: ["tk_verdant_claims"] }),
+    T({ id: "tk_verdant_kv", projectId: "pr_verdant_launch", milestoneId: "ms_verdant_concept", title: "Launch key visual", assigneeId: "p_aisha", status: "done", due: "2026-06-26", completedOn: "2026-06-30", estimateHours: 40, revisionRounds: 4 }),
+    T({ id: "tk_verdant_motion", projectId: "pr_verdant_launch", milestoneId: "ms_verdant_media", title: "Launch motion cut-downs", assigneeId: "c_ivy", status: "todo", due: "2026-10-23", estimateHours: 24, dependsOn: ["tk_verdant_claims"] }),
 
-    T({ id: "tk_atlas_banners", projectId: "pr_atlas_ret", title: "Summer promo banners (unplanned request)", assigneeId: "p_leo", status: "done", due: "2026-07-24", completedOn: "2026-07-23", estimateHours: 14 }),
+    T({ id: "tk_atlas_banners", projectId: "pr_atlas_ret", title: "Summer promo banners (unplanned request)", assigneeId: "p_leo", status: "done", due: "2026-07-24", completedOn: "2026-07-23", estimateHours: 14, revisionRounds: 1 }),
     T({ id: "tk_atlas_studio", projectId: "pr_atlas_ret", title: "Studio opening landing page (unplanned request)", assigneeId: "p_tom", status: "done", due: "2026-08-28", completedOn: "2026-08-27", estimateHours: 26 }),
     T({ id: "tk_atlas_schedule", projectId: "pr_atlas_ret", title: "Class schedule page refresh (unplanned request)", assigneeId: "p_priya", status: "in_progress", due: "2026-09-25", estimateHours: 30 }),
     T({ id: "tk_atlas_referral", projectId: "pr_atlas_ret", title: "Member referral microsite (requested Oct 2)", assigneeId: "p_hannah", status: "todo", due: "2026-10-30", estimateHours: 60, blockerNote: "Not covered by retainer; needs scoping" }),
 
     T({ id: "tk_bw_handoff_docs", projectId: "pr_bw_onboard", milestoneId: "ms_bw_handoff", title: "Hand-off documentation", assigneeId: "p_tom", status: "in_progress", due: "2026-10-23", estimateHours: 30 }),
     T({ id: "tk_bw_rfp", projectId: "pr_bw_ret", milestoneId: "ms_bw_renewal", title: "RFP response and renewal proposal", assigneeId: "p_james", status: "in_progress", due: "2026-10-20", estimateHours: 24 }),
+    T({ id: "tk_bw_q4_creative", projectId: "pr_bw_ret", title: "Q4 member campaign creative", assigneeId: "p_nina", status: "in_progress", due: "2026-10-09", estimateHours: 28, revisionRounds: 1 }),
+    T({ id: "tk_bw_rfp_creative", projectId: "pr_bw_ret", milestoneId: "ms_bw_renewal", title: "Creative case studies for the RFP response", assigneeId: "p_aisha", status: "todo", due: "2026-10-16", estimateHours: 16 }),
 
     T({ id: "tk_lumen_data", projectId: "pr_lumen_sprint", milestoneId: "ms_lumen_final", title: "Receive sample data from client", assigneeId: "p_hannah", status: "blocked", due: "2026-08-21", estimateHours: 1, blockerNote: "No response since Aug 12" }),
     T({ id: "tk_lumen_final", projectId: "pr_lumen_sprint", milestoneId: "ms_lumen_final", title: "High-fidelity dashboard screens", assigneeId: "p_leo", status: "todo", due: "2026-10-16", estimateHours: 40, dependsOn: ["tk_lumen_data"] }),
 
     T({ id: "tk_orchard_player", projectId: "pr_orchard_platform", milestoneId: "ms_orchard_build", title: "Lesson player front-end", assigneeId: "p_omar", status: "in_progress", due: "2026-10-30", estimateHours: 80 }),
     T({ id: "tk_orchard_catalog", projectId: "pr_orchard_platform", milestoneId: "ms_orchard_build", title: "Catalog search and filters", assigneeId: "p_omar", status: "todo", due: "2026-11-06", estimateHours: 50 }),
+    T({ id: "tk_orchard_lesson_ui", projectId: "pr_orchard_platform", milestoneId: "ms_orchard_build", title: "Lesson screens visual design", assigneeId: "p_aisha", status: "in_progress", due: "2026-10-21", estimateHours: 36, revisionRounds: 1 }),
 
     T({ id: "tk_nw_directions", projectId: "pr_northwind_brand", milestoneId: "ms_nw_directions", title: "Three brand directions", assigneeId: "p_chloe", status: "in_progress", due: "2026-10-16", estimateHours: 50 }),
+    T({ id: "tk_nw_identity", projectId: "pr_northwind_brand", milestoneId: "ms_nw_directions", title: "Identity sketches for the three directions", assigneeId: "p_aisha", status: "in_progress", due: "2026-10-14", estimateHours: 20 }),
 
     T({ id: "tk_tool_dash", projectId: "pr_int_toolkit", milestoneId: "ms_tool_dashboard", title: "Resourcing dashboard prototype", assigneeId: "p_ryan", status: "in_progress", due: "2026-10-30", estimateHours: 60 }),
     T({ id: "tk_site_cases", projectId: "pr_int_site", milestoneId: "ms_site_launch", title: "Case study designs", assigneeId: "p_leo", status: "todo", due: "2026-09-25", estimateHours: 30, blockerNote: "Leo reassigned to Harbor & Pine" }),
@@ -651,6 +671,33 @@ export function buildAgency(): Dataset {
     thread(ORG, "th_nw_kickoff", { accountId: "a_northwind", projectId: "pr_northwind_brand", channel: "email", subject: "Discovery kickoff", location: "hannah@fieldwork.example" }, [
       ["2026-09-09", "Nora Quinn", "client", "Excited to start. The team is ready for the workshop."],
       ["2026-09-25", "Nora Quinn", "client", "Really pleased with the discovery workshop. The brand directions are exactly what we needed. We'd love to talk about a new website after this phase."],
+    ]),
+
+    // Creative feedback that names people. Dated no later than each account's latest client message, so health and signals are unchanged.
+    thread(ORG, "th_meridian_articles", { accountId: "a_meridian", projectId: "pr_meridian_content", channel: "email", subject: "September articles", location: "james@fieldwork.example" }, [
+      ["2026-09-24", "Elena Ruiz", "client", "Nina's September articles needed another round of medical-accuracy edits before our clinical team could publish them. Can we tighten the review step?"],
+      ["2026-09-24T18:00:00Z", "Nina Petrova", "internal", "Understood. I'll add a clinical fact-check pass before drafts come to you."],
+      ["2026-09-30", "Elena Ruiz", "client", "The first October article came through clean. Much better, thank you Nina."],
+    ]),
+    thread(ORG, "th_atlas_banner_turnaround", { accountId: "a_atlas", projectId: "pr_atlas_ret", channel: "slack", subject: "#ext-atlas: summer banners", location: "#ext-atlas" }, [
+      ["2026-07-24", "Jordan Blake", "client", "Fast turnaround from Leo on the summer banners. Spot on for the brand."],
+    ]),
+    thread(ORG, "th_copper_copy", { accountId: "a_copperline", projectId: "pr_copper_growth", channel: "email", subject: "Shipper campaign copy", location: "sofia@fieldwork.example" }, [
+      ["2026-09-18", "Lisa Moreno", "client", "The shipper ad copy from Studio Kite is off-brand again. This is the third draft and it still reads like a generic freight company."],
+      ["2026-09-18T17:30:00Z", "Sofia Alvarez", "internal", "Fair point. Nina and Studio Kite are reworking it against your brand guide this week."],
+      ["2026-09-29", "Lisa Moreno", "client", "The reworked copy is spot on. Ready to go live."],
+    ]),
+    thread(ORG, "th_verdant_kv", { accountId: "a_verdant", projectId: "pr_verdant_launch", channel: "slack", subject: "#ext-verdant: launch key visual", location: "#ext-verdant" }, [
+      ["2026-07-02", "Sam Whitaker", "client", "The key visual Aisha's team landed is the strongest launch creative we've had from an agency. It took a few rounds but it was worth it."],
+    ]),
+    thread(ORG, "th_bw_campaign", { accountId: "a_brightwater", projectId: "pr_bw_ret", channel: "slack", subject: "#ext-brightwater: member campaign", location: "#ext-brightwater" }, [
+      ["2026-09-10", "Karen Mills", "client", "The member campaign creative from Nina and Studio Kite is outperforming last quarter. Beautiful work."],
+    ]),
+    thread(ORG, "th_orchard_lessons", { accountId: "a_orchard", projectId: "pr_orchard_platform", channel: "email", subject: "Lesson screens", location: "sofia@fieldwork.example" }, [
+      ["2026-09-21", "Fiona Hart", "client", "Aisha's lesson screens are excellent. A couple of typos in the labels, but our instructors are excited."],
+    ]),
+    thread(ORG, "th_creative_load", { accountId: "a_harbor", projectId: "pr_harbor_web", channel: "slack", subject: "#delivery-harbor: creative load", location: "#delivery-harbor" }, [
+      ["2026-10-01T16:00:00Z", "Rosa Delgado", "internal", "Leo is carrying Harbor QA, the Verdant adaptations, the Lumen screens and the studio case studies. I'll protect Harbor QA first and move the case studies."],
     ]),
   ];
 

@@ -190,7 +190,7 @@ export function applyImport(store: StateStore, ctx: RequestContext, dataset: She
 
 export function setReportingCurrency(store: StateStore, ctx: RequestContext, currency: CurrencyCode): Result {
   if (!["USD", "EUR", "GBP"].includes(currency)) return { ok: false, error: "Unsupported currency." };
-  if (ctx.role === "account_owner") return { ok: false, error: "Your role cannot change organization settings." };
+  if (capsFor(ctx.role).recordScope !== "all") return { ok: false, error: "Your role cannot change organization settings." };
   withOverlay(store, ctx, ctx.role, "settings.currency", currency, (o) => {
     o.settings = { ...o.settings, reportingCurrency: currency };
   });

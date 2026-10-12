@@ -11,8 +11,11 @@ import type { SheetDatasetKey } from "./connectors/sheets";
  * integrations does not grant financial, compensation or communication access.
  */
 export interface Capabilities {
-  /** Record scope: every account, or only accounts the user owns. */
-  allAccounts: boolean;
+  /**
+   * Record scope: every account; only accounts the user owns; or the user's department, meaning the
+   * projects their department's people are assigned to or record time on, and only those people.
+   */
+  recordScope: "all" | "own_accounts" | "department";
   /** Company-wide P&L, payroll, overhead, operating result, cash forecast and concentration. */
   viewCompanyFinance: boolean;
   /** Earned revenue, direct-cost aggregates, margins, budgets and bill rates for permitted accounts and projects. */
@@ -21,8 +24,8 @@ export interface Capabilities {
   viewCompensation: boolean;
   /** Contract and renewal values, invoice and payment amounts, receivables, milestone billing and opportunity estimates. */
   viewCommercialTerms: boolean;
-  /** Message content the role may read. */
-  communications: "all" | "billing_only" | "own_accounts" | "none";
+  /** Message content the role may read. "department": threads about the department's projects, never billing or account-level threads. */
+  communications: "all" | "billing_only" | "own_accounts" | "department" | "none";
   /** Confirm, dismiss or resolve inferred signals. */
   reviewSignals: boolean;
   /** Create and update actions (plans). */
@@ -35,6 +38,12 @@ export interface Capabilities {
   importDatasets: "all" | "non_restricted" | "none";
   /** Detailed connector status, failures, mappings and import history. Everyone sees a plain-language summary of stale sources. */
   viewSystemDetail: boolean;
+  /**
+   * The department workspace: project profitability, retainer hours, task watchouts, department P&L,
+   * hours and comms-based performance for one department. "own" is the head's own department.
+   * Team cost appears only as aggregates; individual cost rates still need `viewCompensation`.
+   */
+  viewDepartment: "all" | "own" | "none";
   resetDemo: boolean;
 }
 
@@ -43,31 +52,37 @@ export const ROLES: Record<RoleId, { label: string; description: string; home: s
     label: "Executive",
     description: "Company-wide view, including compensation and all authorized communications. Cannot change integrations.",
     home: "Major risks, decisions that need you, operating and cash outlook, and the plans already in place.",
-    caps: { allAccounts: true, viewCompanyFinance: true, viewProjectCosts: true, viewCompensation: true, viewCommercialTerms: true, communications: "all", reviewSignals: true, manageActions: true, applyScenarios: true, manageIntegrations: false, importDatasets: "none", viewSystemDetail: true, resetDemo: true },
+    caps: { recordScope: "all", viewCompanyFinance: true, viewProjectCosts: true, viewCompensation: true, viewCommercialTerms: true, communications: "all", reviewSignals: true, manageActions: true, applyScenarios: true, manageIntegrations: false, importDatasets: "none", viewSystemDetail: true, viewDepartment: "all", resetDemo: true },
   },
   finance: {
     label: "Finance",
     description: "All financial data and compensation; communications limited to billing threads. Can import financial datasets.",
     home: "Collections, billing, unbilled work, margin exceptions, cash outlook, missing cost records and Finance-owned actions.",
-    caps: { allAccounts: true, viewCompanyFinance: true, viewProjectCosts: true, viewCompensation: true, viewCommercialTerms: true, communications: "billing_only", reviewSignals: false, manageActions: true, applyScenarios: true, manageIntegrations: false, importDatasets: "all", viewSystemDetail: true, resetDemo: true },
+    caps: { recordScope: "all", viewCompanyFinance: true, viewProjectCosts: true, viewCompensation: true, viewCommercialTerms: true, communications: "billing_only", reviewSignals: false, manageActions: true, applyScenarios: true, manageIntegrations: false, importDatasets: "all", viewSystemDetail: true, viewDepartment: "none", resetDemo: true },
   },
   account_owner: {
     label: "Account owner",
     description: "Only the accounts they own, including their contract values, invoices and project margins. Never individual salaries, company results or cash.",
     home: "Your accounts only: client commitments, unresolved issues, renewals, opportunities and your actions.",
-    caps: { allAccounts: false, viewCompanyFinance: false, viewProjectCosts: true, viewCompensation: false, viewCommercialTerms: true, communications: "own_accounts", reviewSignals: true, manageActions: true, applyScenarios: false, manageIntegrations: false, importDatasets: "none", viewSystemDetail: false, resetDemo: true },
+    caps: { recordScope: "own_accounts", viewCompanyFinance: false, viewProjectCosts: true, viewCompensation: false, viewCommercialTerms: true, communications: "own_accounts", reviewSignals: true, manageActions: true, applyScenarios: false, manageIntegrations: false, importDatasets: "none", viewSystemDetail: false, viewDepartment: "none", resetDemo: true },
+  },
+  department_head: {
+    label: "Department head",
+    description: "Only their department: its people, the projects they work on, those projects' margins and retainers, and the department P&L. Team cost as totals, never individual salaries; no company results, cash or account-level threads.",
+    home: "Your department: creative watchouts, retainer hours, project margins, team hours and the plans you own.",
+    caps: { recordScope: "department", viewCompanyFinance: false, viewProjectCosts: true, viewCompensation: false, viewCommercialTerms: true, communications: "department", reviewSignals: false, manageActions: true, applyScenarios: false, manageIntegrations: false, importDatasets: "none", viewSystemDetail: false, viewDepartment: "own", resetDemo: true },
   },
   admin: {
     label: "Administrator",
     description: "Manages integrations, mappings and non-restricted imports. No compensation, financial values or message content.",
     home: "Failed or stale connections, mapping reviews, import errors, and which reports are affected by unreliable sources.",
-    caps: { allAccounts: true, viewCompanyFinance: false, viewProjectCosts: false, viewCompensation: false, viewCommercialTerms: false, communications: "none", reviewSignals: false, manageActions: false, applyScenarios: false, manageIntegrations: true, importDatasets: "non_restricted", viewSystemDetail: true, resetDemo: true },
+    caps: { recordScope: "all", viewCompanyFinance: false, viewProjectCosts: false, viewCompensation: false, viewCommercialTerms: false, communications: "none", reviewSignals: false, manageActions: false, applyScenarios: false, manageIntegrations: true, importDatasets: "non_restricted", viewSystemDetail: true, viewDepartment: "none", resetDemo: true },
   },
 };
 
 /** Labels for the capability matrix shown in Administration and the docs. */
 export const CAPABILITY_LABELS: [keyof Capabilities, string][] = [
-  ["allAccounts", "All accounts (otherwise only accounts they own)"],
+  ["recordScope", "Record scope"],
   ["viewCompanyFinance", "Company financial summaries and cash"],
   ["viewProjectCosts", "Account and project financial aggregates"],
   ["viewCompensation", "Individual compensation and loaded labor cost"],
@@ -79,6 +94,7 @@ export const CAPABILITY_LABELS: [keyof Capabilities, string][] = [
   ["manageIntegrations", "Manage integrations and mappings"],
   ["importDatasets", "Imports"],
   ["viewSystemDetail", "Connector and import detail"],
+  ["viewDepartment", "Department workspace"],
 ];
 
 export function capsFor(role: RoleId): Capabilities {
@@ -92,10 +108,15 @@ export function canImport(caps: Capabilities, dataset: { key: SheetDatasetKey; r
 }
 
 export function isRole(x: unknown): x is RoleId {
-  return x === "executive" || x === "finance" || x === "account_owner" || x === "admin";
+  return x === "executive" || x === "finance" || x === "account_owner" || x === "department_head" || x === "admin";
+}
+
+/** Every record in the organization, as opposed to a slice of it (owned accounts, one department). */
+export function seesAllRecords(caps: Capabilities): boolean {
+  return caps.recordScope === "all";
 }
 
 /** Which scope label applies to an aggregate for this role. Used so differently scoped figures are never shown unlabeled. */
-export function aggregateScope(caps: Capabilities): "Company-wide" | "Your accounts" {
-  return caps.allAccounts ? "Company-wide" : "Your accounts";
+export function aggregateScope(caps: Capabilities): "Company-wide" | "Your accounts" | "Your department" {
+  return caps.recordScope === "all" ? "Company-wide" : caps.recordScope === "department" ? "Your department" : "Your accounts";
 }

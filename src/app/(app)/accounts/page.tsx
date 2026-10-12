@@ -46,7 +46,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: SP 
 
   const presets = [
     { label: "All", href: "/accounts", active: !view, count: rows.length },
-    ...(ws.caps.allAccounts && ownsAny ? [{ label: `My ${t.accounts.toLowerCase()}`, href: "/accounts?view=mine", active: view === "mine", count: rows.filter((r) => inView(r, "mine")).length }] : []),
+    ...(ws.caps.recordScope === "all" && ownsAny ? [{ label: `My ${t.accounts.toLowerCase()}`, href: "/accounts?view=mine", active: view === "mine", count: rows.filter((r) => inView(r, "mine")).length }] : []),
     { label: "Needs attention", href: "/accounts?view=attention", active: view === "attention", count: rows.filter((r) => inView(r, "attention")).length },
     ...(mode !== "budget" ? [{ label: "Renewals soon", href: "/accounts?view=renewals", active: view === "renewals", count: rows.filter((r) => inView(r, "renewals")).length }] : []),
     ...(showOverdue ? [{ label: "Overdue collections", href: "/accounts?view=overdue", active: view === "overdue", count: rows.filter((r) => inView(r, "overdue")).length }] : []),
@@ -80,7 +80,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: SP 
             <option value="unknown">Not enough data</option>
           </select>
         </div>
-        {ws.caps.allAccounts && (
+        {ws.caps.recordScope === "all" && (
           <div>
             <label className="label" htmlFor="owner">
               {t.owner}

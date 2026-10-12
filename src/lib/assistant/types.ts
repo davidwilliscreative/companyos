@@ -1,6 +1,6 @@
 import type { EvidenceLink, ID } from "@/domain/types";
 
-export type AssistantScopeKind = "account" | "project" | "my_accounts" | "company";
+export type AssistantScopeKind = "account" | "project" | "my_accounts" | "my_department" | "company";
 
 export interface AssistantRequest {
   question: string;
@@ -8,7 +8,7 @@ export interface AssistantRequest {
    * Scope of the conversation. With an accountId or projectId the answer,
    * caveats, evidence and suggested follow-ups stay inside that record.
    * Without one, the scope is everything the role may read: "my_accounts" for
-   * account owners, "company" for all-account roles.
+   * account owners, "my_department" for department heads, "company" for all-account roles.
    */
   scope?: { accountId?: ID; projectId?: ID };
 }

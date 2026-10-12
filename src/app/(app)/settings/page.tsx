@@ -15,7 +15,7 @@ export default async function SettingsPage() {
   const ws = await getWorkspace();
   const audit = (await readStore())
     .read()
-    .audit.filter((x) => x.orgId === ws.org.id && (ws.caps.allAccounts || x.actor === ws.user.id))
+    .audit.filter((x) => x.orgId === ws.org.id && (ws.caps.recordScope === "all" || x.actor === ws.user.id))
     .slice(-15)
     .reverse();
   const roles = Object.keys(ROLES) as RoleId[];
@@ -55,7 +55,7 @@ export default async function SettingsPage() {
             ]}
           />
           <div className="mt-4 border-t border-line pt-4">
-            <CurrencyForm current={ws.org.reportingCurrency} canChange={ws.ctx.role !== "account_owner"} />
+            <CurrencyForm current={ws.org.reportingCurrency} canChange={ws.caps.recordScope === "all"} />
             <p className="mt-2 text-xs text-ink-muted">
               Records in other currencies are converted with fixed demo rates:{" "}
               {Object.entries(DEMO_FX_TO_USD)

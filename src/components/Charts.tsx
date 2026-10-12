@@ -30,7 +30,7 @@ export interface MonthDatum {
 }
 
 /** Earned revenue vs direct cost by month, with delivery margin as its own small chart (one axis each). */
-export function RevenueChart({ data, symbol, title, stacked = false }: { data: MonthDatum[]; symbol: string; title: string; stacked?: boolean }) {
+export function RevenueChart({ data, symbol, title, stacked = false, labels = { earned: "Earned revenue", directCost: "Direct cost", margin: "Delivery margin" } }: { data: MonthDatum[]; symbol: string; title: string; stacked?: boolean; labels?: { earned: string; directCost: string; margin: string } }) {
   const fmt = compact(symbol);
   const margins = data.map((d) => ({ label: d.label, marginPct: d.margin === null ? null : Math.round(d.margin * 100) }));
   const hasMargin = margins.some((m) => m.marginPct !== null);
@@ -46,23 +46,23 @@ export function RevenueChart({ data, symbol, title, stacked = false }: { data: M
               <YAxis {...AXIS} tickFormatter={fmt} width={56} />
               <Tooltip {...TOOLTIP} formatter={(v) => fmt(Number(v))} />
               <Legend {...LEGEND} />
-              <Bar dataKey="earned" name="Earned revenue" fill={C.s1} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="directCost" name="Direct cost" fill={C.s2} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="earned" name={labels.earned} fill={C.s1} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="directCost" name={labels.directCost} fill={C.s2} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </figure>
       {hasMargin && (
         <figure>
-          <figcaption className="mb-2 text-[13px] font-medium text-ink-soft">Delivery margin</figcaption>
+          <figcaption className="mb-2 text-[13px] font-medium text-ink-soft">{labels.margin}</figcaption>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={margins} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                 <CartesianGrid stroke={C.grid} vertical={false} />
                 <XAxis dataKey="label" {...AXIS} tickFormatter={(v: string) => v.slice(0, 3)} />
                 <YAxis {...AXIS} tickFormatter={(v: number) => `${v}%`} width={52} domain={[0, 100]} />
-                <Tooltip {...TOOLTIP} cursor={{ stroke: C.muted, strokeDasharray: "3 3" }} formatter={(v) => [`${v}%`, "Delivery margin"]} />
-                <Line dataKey="marginPct" name="Delivery margin" stroke={C.ink} strokeWidth={2} dot={{ r: 4, fill: "#fff", strokeWidth: 2 }} activeDot={{ r: 5 }} connectNulls={false} />
+                <Tooltip {...TOOLTIP} cursor={{ stroke: C.muted, strokeDasharray: "3 3" }} formatter={(v) => [`${v}%`, labels.margin]} />
+                <Line dataKey="marginPct" name={labels.margin} stroke={C.ink} strokeWidth={2} dot={{ r: 4, fill: "#fff", strokeWidth: 2 }} activeDot={{ r: 5 }} connectNulls={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

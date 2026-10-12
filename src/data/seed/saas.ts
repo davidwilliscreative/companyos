@@ -32,7 +32,8 @@ export function buildSaas(): Dataset {
       { id: "add_seats", name: "Additional seats", keywords: ["more seats", "seats", "licenses", "rollout", "other teams"] },
       { id: "add_api", name: "Data API add-on", keywords: ["api", "export", "warehouse", "integration"] },
     ],
-    demoPersonas: { executive: "s_maya", finance: "s_luis", account_owner: "s_jess", admin: "s_sam" },
+    demoPersonas: { executive: "s_maya", finance: "s_luis", account_owner: "s_jess", department_head: "s_ana", admin: "s_sam" },
+    departments: [{ name: "Product & Engineering", headId: "s_ana" }],
   };
 
   const person = (id: string, name: string, title: string, role: string, department: string, salary: number, startDate = "2024-02-01"): [Person, number] => [
@@ -45,7 +46,7 @@ export function buildSaas(): Dataset {
     person("s_jess", "Jess Park", "Head of Customer Success", "Customer success", "Customer Success", 125_000),
     person("s_kai", "Kai Morgan", "Customer Success Manager", "Customer success", "Customer Success", 95_000),
     person("s_sam", "Sam Rivera", "IT & Security Administrator", "Operations", "Operations", 110_000),
-    person("s_ana", "Ana Silva", "Staff Engineer", "Engineer", "Product & Engineering", 185_000),
+    person("s_ana", "Ana Silva", "Head of Product & Engineering", "Engineer", "Product & Engineering", 185_000),
     person("s_dev", "Devon Price", "Senior Engineer", "Engineer", "Product & Engineering", 165_000),
     person("s_ola", "Ola Bergstrom", "Engineer", "Engineer", "Product & Engineering", 140_000),
     person("s_rin", "Rin Takahashi", "Product Manager", "Product manager", "Product & Engineering", 150_000),

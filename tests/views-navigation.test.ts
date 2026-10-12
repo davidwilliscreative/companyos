@@ -8,7 +8,7 @@ import { ACCOUNT_VIEWS, accountRows, inAccountView, inProjectView, PROJECT_VIEWS
 import { ws } from "./helpers";
 
 const PROFILES: ProfileId[] = ["agency", "saas", "enterprise"];
-const ROLES: RoleId[] = ["executive", "finance", "account_owner", "admin"];
+const ROLES: RoleId[] = ["executive", "finance", "account_owner", "department_head", "admin"];
 const APP = path.join(__dirname, "../src/app/(app)");
 const routeExists = (p: string) => fs.existsSync(path.join(APP, p === "/" ? "" : p, "page.tsx"));
 

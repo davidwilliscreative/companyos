@@ -251,6 +251,59 @@ export function homeFor(ws: Workspace): HomeModel {
       });
       break;
     }
+    case "department_head": {
+      const d = ws.department();
+      if (!d) break;
+      const urgentWatch = d.watchouts.filter((w) => w.severity === "critical" || w.severity === "high");
+      briefing.push(
+        d.watchouts.length
+          ? `${d.name} has ${plural(d.watchouts.length, "watchout", "watchouts")}${urgentWatch.length ? `, ${urgentWatch.length} urgent` : ""}. First: ${d.watchouts[0].title}.`
+          : `Nothing in ${d.name}'s work needs attention right now.`,
+      );
+      if (mode === "delivery" && d.pnl.revenue > 0)
+        briefing.push(
+          `${a.period.label}: your team contributed ${money(d.pnl.contribution)} on ${money(d.pnl.revenue)} of attributed revenue (${fmtPct(d.pnl.contributionMargin)}). After the rest of team payroll, the department result is ${money(d.pnl.result)}.`,
+        );
+      const over = d.retainers.filter((r) => r.status === "over");
+      if (over.length) briefing.push(`${plural(over.length, "retainer", "retainers")} went over the included hours last month; the largest was ${ws.data.projects.find((p) => p.id === over[0].projectId)?.name} at ${fmtPct(over[0].last?.pct ?? null)}.`);
+      const kpi = (key: string) => d.kpis.find((k) => k.key === key)!;
+      const deptScope = `${d.name} department`;
+      metrics.push({
+        label: "Watchouts",
+        value: String(d.watchouts.length),
+        scope: deptScope,
+        period: asOf,
+        time: "current",
+        kind: "calculated",
+        sub: urgentWatch.length ? `${urgentWatch.length} urgent · tasks, retainers, workload` : "None urgent",
+        warnings: [],
+        href: "/department",
+        tone: urgentWatch.length ? "bad" : d.watchouts.length ? "warn" : "good",
+      });
+      if (mode === "delivery")
+        metrics.push({
+          label: "Department contribution",
+          value: money(d.pnl.contribution),
+          scope: deptScope,
+          period: periodLabel,
+          time: "historical",
+          kind: "calculated",
+          sub: `${fmtPct(d.pnl.contributionMargin)} margin · result after team payroll ${money(d.pnl.result)}`,
+          warnings: d.pnl.missing.length ? [{ label: "Incomplete costs", detail: d.pnl.missing.join(" ") }] : [],
+          href: "/department?tab=pnl",
+          calcHref: "/calculations#department",
+          tone: d.pnl.result < 0 ? "bad" : kpi("contribution").tone === "good" ? undefined : "warn",
+        });
+      const util = kpi("utilization");
+      if (ws.profile.modules.billableUtilization)
+        metrics.push({ label: "Billable utilization", value: fmtPct(util.value), scope: deptScope, period: periodLabel, time: "historical", kind: "calculated", sub: `Target ${fmtPct(util.target)} · ${util.sub.replace(/^Employees · /, "")}`, warnings: [], href: "/department?tab=people", calcHref: "/calculations#utilization", tone: util.tone === "good" ? undefined : util.tone });
+      const ret = kpi("retainer");
+      if (d.retainers.length)
+        metrics.push({ label: "Retainer hours used", value: fmtPct(ret.value), scope: deptScope, period: ret.sub.split(" · ")[1] ?? asOf, time: "historical", kind: "calculated", sub: ret.sub.split(" · ")[0], warnings: [], href: "/department?tab=retainers", tone: ret.tone === "good" ? undefined : ret.tone });
+      const fb = kpi("feedback");
+      metrics.push({ label: "Client feedback score", value: fb.value === null ? "—" : `${fb.value}/100`, scope: deptScope, period: "Since history starts", time: "current", kind: "inferred", sub: fb.sub, warnings: [], href: "/department?tab=people#feedback", tone: fb.tone === "good" ? undefined : fb.tone });
+      break;
+    }
     case "admin": {
       const sys = all.filter((i) => i.kind === "system");
       const affected = [...new Set(ws.sources.flatMap((s) => s.affects))];
@@ -334,6 +387,8 @@ function roleFocus(ws: Workspace, role: RoleId): string {
           : "Collections, unbilled work, margins, cash and the cost records behind them.";
     case "account_owner":
       return `Your ${accounts}: their issues${mode === "budget" ? "" : ", renewals"} and the plans you own.`;
+    case "department_head":
+      return `Your ${ws.departmentName ?? "department"} team: what needs attention in its work${mode === "delivery" ? ", retainer hours, margins" : ""} and team hours.`;
     case "admin":
       return "Connections, mappings and imports, and which reports they affect.";
   }

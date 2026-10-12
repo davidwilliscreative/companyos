@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { addMemberAction, createActionAction, decideMappingAction, editOpportunityAction, removeMemberAction, resetDemoAction, reviewSignalAction, setCurrencyAction, updateActionAction } from "@/app/actions";
 import type { Action, CurrencyCode, EvidenceLink, Opportunity, ReviewStatus, RoleId, Severity } from "@/domain/types";
 
-const ROLE_LABELS: Record<RoleId, string> = { executive: "Executive", finance: "Finance", account_owner: "Account owner", admin: "Administrator" };
+const ROLE_LABELS: Record<RoleId, string> = { executive: "Executive", finance: "Finance", account_owner: "Account owner", department_head: "Department head", admin: "Administrator" };
 
 type Res = { ok: true } | { ok: false; error: string };
 
