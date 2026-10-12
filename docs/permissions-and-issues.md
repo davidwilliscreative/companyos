@@ -12,27 +12,36 @@ How OpsInstinct decides who sees what, how alerts become issues, and how status 
 
 Each role is a set of separate capabilities. Business data and system administration are independent, so managing integrations grants no access to money, compensation or messages.
 
-| Capability | Executive | Finance | Account owner | Administrator |
-| --- | --- | --- | --- | --- |
-| Record scope (`allAccounts`) | All accounts | All accounts | Accounts they own | All accounts, without money or messages |
-| Company financial summaries and cash (`viewCompanyFinance`) | Yes | Yes | No | No |
-| Account and project financial aggregates (`viewProjectCosts`) | Yes | Yes | Own accounts | No |
-| Individual compensation and loaded labor cost (`viewCompensation`) | Yes | Yes | No | No |
-| Contract values and invoice amounts (`viewCommercialTerms`) | Yes | Yes | Own accounts | No |
-| Communications (`communications`) | All | Billing threads only | Own accounts | None |
-| Review signals (`reviewSignals`) | Yes | No | Yes | No |
-| Create and manage plans (`manageActions`) | Yes | Yes | Yes | No |
-| Apply what-if scenarios (`applyScenarios`) | Yes | Yes | No | No |
-| Manage integrations and mappings (`manageIntegrations`) | No | No | No | Yes |
-| Imports (`importDatasets`) | None | All | None | Non-restricted only |
-| Connector and import detail (`viewSystemDetail`) | Yes | Yes | No | Yes |
-| Reset demo (`resetDemo`) | Yes | Yes | Yes | Yes |
+| Capability | Executive | Finance | Account owner | Department head | Administrator |
+| --- | --- | --- | --- | --- | --- |
+| Record scope (`recordScope`) | All | All | Accounts they own | Their department's people and the projects they work on | All, without money or messages |
+| Company financial summaries and cash (`viewCompanyFinance`) | Yes | Yes | No | No | No |
+| Account and project financial aggregates (`viewProjectCosts`) | Yes | Yes | Own accounts | Department projects | No |
+| Individual compensation and loaded labor cost (`viewCompensation`) | Yes | Yes | No | No (team totals only) | No |
+| Contract values and invoice amounts (`viewCommercialTerms`) | Yes | Yes | Own accounts | Department projects | No |
+| Communications (`communications`) | All | Billing threads only | Own accounts | Threads about department projects, never billing or account-level | None |
+| Review signals (`reviewSignals`) | Yes | No | Yes | No | No |
+| Create and manage plans (`manageActions`) | Yes | Yes | Yes | Yes | No |
+| Apply what-if scenarios (`applyScenarios`) | Yes | Yes | No | No | No |
+| Manage integrations and mappings (`manageIntegrations`) | No | No | No | No | Yes |
+| Imports (`importDatasets`) | None | All | None | None | Non-restricted only |
+| Connector and import detail (`viewSystemDetail`) | Yes | Yes | No | No | Yes |
+| Department workspace (`viewDepartment`) | All | No | No | Own department | No |
+| Reset demo (`resetDemo`) | Yes | Yes | Yes | Yes | Yes |
 
 ### Enforcement
 
 `buildWorkspace` in `src/data/access.ts` is the only boundary. Screens, the issue model and the assistant receive a workspace that has already been filtered, so a page cannot leak what it was never given.
 
 - **Account owner.** Records for other accounts are removed. Capacity still counts their load so overloads are visible. Those projects appear as "Other work", and attention text names only permitted projects plus "N other projects".
+- **Department head.** The department is everyone whose `department` matches the one the head leads (`org.departments`). Its projects are those its people are assigned to or record time on. The data layer:
+  - loads only those projects, their tasks, milestones, time and expenses, and the contracts and invoices tied to them
+  - lists only the department's people on Capacity and Rates; their work on other projects appears as "Other work"
+  - loads only threads about department projects, never account-level or billing threads; signals come only from those threads
+  - drops opportunities, subscriptions and account-level alerts (health, renewals, collections), which belong to account owners and finance
+  - computes the department P&L from compensation on the server and returns totals only, never a salary or cost rate
+
+  The department workspace (`/department`) shows watchouts, project profitability, retainer hours, the P&L, hours and comms-based feedback. Feedback is a simulated review of readable client messages, each linked to its source message. Executives can open the same page.
 - **Administrator.** The data layer removes the following:
   - money fields: rates, invoices, contract values, budgets and costs
   - compensation
@@ -46,8 +55,9 @@ Each role is a set of separate capabilities. Business data and system administra
 
 Every aggregate shows its scope:
 
-- **Company-wide** for roles with `allAccounts`
+- **Company-wide** for roles whose `recordScope` is all
 - **Your accounts** for account owners
+- **Your department** for department heads
 - **This client** or **This project** on detail pages
 
 ## 2. Issues
@@ -146,6 +156,7 @@ The reason is shown on the issue.
 | Executive | Executive decisions first. System issues only if high severity. |
 | Finance | Collections, margin, budget and cost-data issues first. Then other issues with a money impact, and system issues that affect receivables, cash, cost or margin. |
 | Account owner | Issues on their accounts. Issues they own rank ahead of equally urgent ones owned by colleagues. No system issues. |
+| Department head | Staffing and delivery issues on department projects first, then margins. No collections, relationship, opportunity or system issues. |
 | Administrator | System and data issues only. |
 
 Home shows the top five issues (three on phones) and always states the total and urgent counts. Urgent items are never hidden without saying so.
@@ -193,11 +204,14 @@ Delivery margin and operating result are different measures:
 
 The Finance page explains the gap in one sentence and keeps the reconciliation behind "Calculation".
 
-## 5. Future work: Delivery Lead role
+## 5. Department head role
 
-A Delivery Lead role (delivery health, staffing and blockers across all projects, without compensation or company finance) was considered. It was not built, because:
+Built as a fifth role with a new record scope, `recordScope: "department"`. Each profile seeds one department and its head:
 
-- it needs a fifth demo persona and seed data in all three profiles
-- it would need a new record scope ("projects I lead" across accounts) that `buildWorkspace` does not yet express
+| Profile | Department | Head |
+| --- | --- | --- |
+| Agency | Creative (design, content and copy) | Rosa Delgado, Head of Creative |
+| SaaS | Product & Engineering | Ana Silva |
+| Larger organization | Digital & IT | Lena Hoffmann |
 
-The capability model supports it as `allAccounts: true`, `viewProjectCosts: false`, `viewCompensation: false`, `communications: "none"`, `manageActions: true`, with a Home focused on milestones, staffing gaps and over-allocation.
+The same scope would serve a Delivery Lead (projects they lead across accounts) by adding a project-ownership variant; it is not built.

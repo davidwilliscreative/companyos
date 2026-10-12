@@ -1,6 +1,6 @@
 import type { Account, Dataset, Evidence, ID, Opportunity, Project, Signal } from "@/domain/types";
 import type { Workspace } from "@/data/access";
-import { assessNewWork } from "@/lib/calc/capacity";
+import { assessNewWork, isDeliveryRole } from "@/lib/calc/capacity";
 import { addDays, daysBetween, fmtDate } from "@/lib/dates";
 import { hrefFor } from "@/lib/links";
 import { fmtHours, fmtMoney, fmtPct } from "@/lib/money";
@@ -78,7 +78,7 @@ function response(intent: string, ws: Workspace, parts: Partial<AssistantRespons
   return {
     provider: PROVIDER,
     intent,
-    scope: parts.scope ?? { kind: ws.caps.allAccounts ? "company" : "my_accounts", label: ws.caps.allAccounts ? "Company-wide" : "My accounts" },
+    scope: parts.scope ?? (ws.caps.recordScope === "all" ? { kind: "company", label: "Company-wide" } : ws.caps.recordScope === "department" ? { kind: "my_department", label: "My department" } : { kind: "my_accounts", label: "My accounts" }),
     answer: parts.answer ?? [],
     figures: parts.figures ?? [],
     evidence,
@@ -172,7 +172,7 @@ function parseNewWork(ws: Workspace, q: string) {
   let assumed = false;
   if (!Object.keys(hoursByRole).length) {
     assumed = true;
-    const deliveryRoles = [...new Set(ws.planning.people.filter((p) => !["Executive", "Finance", "Operations", "Account management", "Customer success", "Unit lead"].includes(p.role)).map((p) => p.role))];
+    const deliveryRoles = [...new Set(ws.planning.people.filter(isDeliveryRole).map((p) => p.role))];
     const defaults: Record<string, number> = { Developer: 160, Engineer: 160, Designer: 120, Strategist: 60, "Project manager": 60, "Product manager": 60, "Program manager": 60, Analyst: 80 };
     for (const r of deliveryRoles) hoursByRole[r] = defaults[r] ?? 60;
   }
@@ -545,7 +545,7 @@ function revenue(c: Ctx): AssistantResponse {
   answer.push(`${s.period.label}: earned revenue ${money(ws, s.earnedRevenue)}, invoiced ${money(ws, s.invoiced)}, collected ${money(ws, s.collected)}. These are different measures: revenue is recognized as work is delivered; invoicing and collection follow billing terms.`);
   if (ws.profile.modules.projectMargins) answer.push(`Delivery margin on client work was ${fmtPct(s.deliveryMargin)} (${money(ws, s.deliveryProfit)} after direct delivery costs of ${money(ws, s.clientDirectCost)}).`);
   if (f.scope === "company") answer.push(`After all payroll, internal costs and overhead, the simplified operating result was ${money(ws, s.operatingResult)}. That is not audited net profit.`);
-  else answer.push("This covers only your accounts. Company payroll, overhead and operating result are restricted to Finance and Executive roles.");
+  else answer.push(`This covers only your ${ws.caps.recordScope === "department" ? "department's projects" : "accounts"}. Company payroll, overhead and operating result are restricted to Finance and Executive roles.`);
   return response("revenue", ws, {
     answer,
     figures: [

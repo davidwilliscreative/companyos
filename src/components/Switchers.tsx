@@ -38,6 +38,7 @@ export function Switchers({ profile, role, period, periods, roleUser, canSwitchR
         <option value="executive">Role: Executive</option>
         <option value="finance">Role: Finance</option>
         <option value="account_owner">Role: Account owner</option>
+        <option value="department_head">Role: Department head</option>
         <option value="admin">Role: Administrator</option>
       </select></label>}
       {show.includes("period") && <label className="contents"><span className="sr-only">Reporting period</span><select className={cls} value={period} onChange={(e) => run(() => setPeriod(e.target.value))}>

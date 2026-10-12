@@ -27,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/accounts", label: t.accounts },
     { href: "/signals", label: ws.profile.modules.expansion ? "Signals & opportunities" : "Signals", badge: unreviewed || undefined, badgeLabel: `${unreviewed} to review` },
     { href: "/communications", label: "Communications", hidden: caps.communications === "none" },
+    { href: "/department", label: ws.departmentName ? `${ws.departmentName} department` : "Department", hidden: !ws.departmentName },
     { href: "/projects", label: t.projects },
     { href: "/team", label: "Capacity" },
     { href: "/team/rates", label: "Rates & costs", hidden: !caps.viewProjectCosts },
@@ -122,7 +123,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
           </header>
           <main id="main" className="mx-auto max-w-[1400px] px-4 pb-16 pt-8 lg:px-10 lg:pt-10">
-            {ws.scopeNote && <div className="mb-6 rounded-xl border border-accent-line bg-accent-soft/60 px-4 py-2.5 text-[13px] text-ink-soft">{ws.scopeNote} Other accounts are not loaded for this role.</div>}
+            {ws.scopeNote && <div className="mb-6 rounded-xl border border-accent-line bg-accent-soft/60 px-4 py-2.5 text-[13px] text-ink-soft">{ws.scopeNote}</div>}
             {children}
           </main>
         </div>

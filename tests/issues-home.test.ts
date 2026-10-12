@@ -7,7 +7,7 @@ import { buildIssues } from "@/lib/issues";
 import { ws } from "./helpers";
 
 const PROFILES: ProfileId[] = ["agency", "saas", "enterprise"];
-const ROLES: RoleId[] = ["executive", "finance", "account_owner", "admin"];
+const ROLES: RoleId[] = ["executive", "finance", "account_owner", "department_head", "admin"];
 
 describe("issues", () => {
   const exec = ws("agency", "executive");

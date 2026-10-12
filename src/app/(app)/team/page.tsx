@@ -38,7 +38,8 @@ export default async function TeamPage({ searchParams }: { searchParams: SP }) {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Delivery" title="Capacity" subtitle={`${a.period.label} for actuals; next 8 weeks for planned load. Capacity = contracted hours × FTE − approved time off.`} />
-      {!ws.caps.allAccounts && <Notice tone="info">Projects outside your accounts are shown as “Other work” so that you can see load without seeing other clients.</Notice>}
+      {ws.caps.recordScope === "own_accounts" && <Notice tone="info">Projects outside your accounts are shown as “Other work” so that you can see load without seeing other clients.</Notice>}
+      {ws.caps.recordScope === "department" && <Notice tone="info">Only your department&apos;s people are listed. Work outside your department&apos;s projects is shown as “Other work” so that you can see their full load.</Notice>}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {billable && (

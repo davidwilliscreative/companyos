@@ -9,7 +9,7 @@ describe("compensation is removed in the data layer", () => {
     expect(ws("agency", "executive").compensation?.length).toBeGreaterThan(0);
     expect(ws("agency", "finance").personCosts).not.toBeNull();
   });
-  it.each(["account_owner", "admin"] as const)("%s receives no compensation records or cost rates", (role) => {
+  it.each(["account_owner", "department_head", "admin"] as const)("%s receives no compensation records or cost rates", (role) => {
     const w = ws("agency", role);
     expect(w.compensation).toBeNull();
     expect(w.data.compensation).toHaveLength(0);

@@ -116,7 +116,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
         title={title}
         subtitle={
           <>
-            {company ? "Company-wide" : "Your accounts only (payroll, overhead and cash are restricted for your role)"} · {a.period.label} · figures in {v.cur}. Earned, invoiced and collected are separate measures. <Link href="/calculations">How each is calculated →</Link>
+            {company ? "Company-wide" : fin.scope === "department" ? "Your department's projects only, whole-project figures (payroll, overhead and cash are restricted for your role; the department P&L is on the Department page)" : "Your accounts only (payroll, overhead and cash are restricted for your role)"} · {a.period.label} · figures in {v.cur}. Earned, invoiced and collected are separate measures. <Link href="/calculations">How each is calculated →</Link>
           </>
         }
       />
@@ -131,7 +131,7 @@ export default async function FinancePage({ searchParams }: { searchParams: SP }
       )}
 
       {(() => {
-        const scope = company ? "Company-wide" : "Your accounts";
+        const scope = company ? "Company-wide" : fin.scope === "department" ? "Your department" : "Your accounts";
         const period = `${a.period.label.replace(/ \(.*\)$/, "")} · ${fmtDate(a.period.start, { year: false })} – ${fmtDate(a.period.end)}`;
         const asOf = `As of ${fmtDate(ws.org.demoDate)}`;
         const costWarn = s.missing.length ? [{ label: "Incomplete costs", detail: s.missing.join(" ") }] : [];

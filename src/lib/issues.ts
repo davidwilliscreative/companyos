@@ -666,7 +666,7 @@ export function buildIssues(ws: Workspace): Issue[] {
   }
   if (ws.caps.manageIntegrations || ws.caps.viewSystemDetail) {
     const review = ws.data.mappings.filter((m) => !ws.overlay.mappingDecisions[m.id] && m.status === "needs_review");
-    if (review.length && ws.caps.allAccounts)
+    if (review.length && ws.caps.recordScope === "all")
       issues.push({
         id: "iss_sys_mappings",
         kind: "system",
@@ -754,6 +754,11 @@ export function issuesForRole(issues: Issue[], role: RoleId, userId: ID): Issue[
     case "account_owner":
       // Their own items rank ahead of equally urgent ones owned by colleagues.
       return issues.filter((i) => i.kind !== "system").sort((a, b) => b.score + (b.ownerId === userId ? 40 : 0) - (a.score + (a.ownerId === userId ? 40 : 0)));
+    case "department_head": {
+      // Staffing and delivery of their department's work first, then margins. Collections, sales and system issues belong to other roles.
+      const own = (i: Issue) => i.kind === "staffing" || i.kind === "delivery";
+      return [...issues.filter(own), ...issues.filter((i) => !own(i))].filter((i) => !["system", "collections", "opportunity", "relationship"].includes(i.kind));
+    }
     case "admin":
       return by((i) => i.kind === "system").filter((i) => i.kind === "system" || i.kind === "data");
   }

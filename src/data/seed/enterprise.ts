@@ -22,7 +22,8 @@ export function buildEnterprise(): Dataset {
     overheadMonthly: [],
     defaultTargetMargin: 0,
     serviceCatalog: [],
-    demoPersonas: { executive: "h_irene", finance: "h_paolo", account_owner: "h_marta", admin: "h_noah" },
+    demoPersonas: { executive: "h_irene", finance: "h_paolo", account_owner: "h_marta", department_head: "h_lena", admin: "h_noah" },
+    departments: [{ name: "Digital & IT", headId: "h_lena" }],
   };
 
   const businessUnits: BusinessUnit[] = [

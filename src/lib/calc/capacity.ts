@@ -3,7 +3,7 @@ import { addDays, maxDate, minDate, mondaysBetween } from "@/lib/dates";
 import { projectFinancials, utilization } from "./finance";
 import { indexOf } from "./index";
 
-const NON_DELIVERY_ROLES = ["Executive", "Finance", "Operations", "Account management", "Customer success", "Unit lead"];
+const NON_DELIVERY_ROLES = ["Executive", "Finance", "Operations", "Account management", "Customer success", "Unit lead", "Department head"];
 
 export function isDeliveryRole(p: Person): boolean {
   return !NON_DELIVERY_ROLES.includes(p.role);

@@ -14,7 +14,7 @@ export type ISODate = string;
 export type ISODateTime = string;
 export type CurrencyCode = "USD" | "EUR" | "GBP";
 export type ProfileId = "agency" | "saas" | "enterprise";
-export type RoleId = "executive" | "finance" | "account_owner" | "admin";
+export type RoleId = "executive" | "finance" | "account_owner" | "department_head" | "admin";
 
 /** Where a record came from. Every record carries provenance. */
 export interface Provenance {
@@ -50,6 +50,8 @@ export interface Organization {
   serviceCatalog: ServiceOffering[];
   /** People the demo role switcher impersonates. */
   demoPersonas: Record<RoleId, ID>;
+  /** Departments with a named head. A head's record scope is the work their department's people are assigned to. */
+  departments: { name: string; headId: ID }[];
 }
 
 export interface ServiceOffering {
@@ -243,6 +245,8 @@ export interface Task {
   estimateHours: number;
   dependsOn: ID[];
   blockerNote?: string;
+  /** Client review rounds so far (creative deliverables). */
+  revisionRounds?: number;
   source: Provenance;
 }
 
