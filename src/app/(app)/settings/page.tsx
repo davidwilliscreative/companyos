@@ -3,11 +3,13 @@ import { Card, CardLink, DefList, PageHeader } from "@/components/ui";
 import { getMember } from "@/data/member";
 import { persistenceDescription } from "@/data/persistence";
 import { getWorkspace, readStore } from "@/data/session";
+import { headers } from "next/headers";
 import { PROFILES } from "@/domain/profiles";
 import type { RoleId } from "@/domain/types";
 import { fmtDate } from "@/lib/dates";
 import { DEMO_FX_TO_USD } from "@/lib/money";
 import { ROLES } from "@/lib/permissions";
+import { PROFILE_LINKS } from "@/lib/profile-links";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { PUBLIC_DEMO } from "@/lib/supabase/config";
 
@@ -24,6 +26,10 @@ export default async function SettingsPage() {
     member?.role === "executive"
       ? ((await supabaseAdmin().from("members").select("email, role, display_name").order("email")).data ?? []).map((x) => ({ email: x.email as string, role: x.role as RoleId, displayName: x.display_name as string | null }))
       : null;
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const origin = host ? `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}` : "";
 
   return (
     <div className="space-y-6">
@@ -86,6 +92,19 @@ export default async function SettingsPage() {
           ))}
           .
         </p>
+      </Card>
+
+      <Card title="Direct links" subtitle="Send one of these to open the app on a profile. Add a role to the end, for example /media_agency/finance, to also pick the role where the role switcher is available.">
+        <ul className="divide-y divide-line text-sm">
+          {Object.values(PROFILES).map((p) => (
+            <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2">
+              <span className="font-medium">{p.label}</span>
+              <a href={`/${PROFILE_LINKS[p.id]}`} className="break-all font-mono text-[13px]">
+                {origin}/{PROFILE_LINKS[p.id]}
+              </a>
+            </li>
+          ))}
+        </ul>
       </Card>
 
       <Card title="Business profiles" subtitle="Switch profiles in the header. Each has its own organization, data, terminology and modules." padded={false}>

@@ -46,6 +46,10 @@ The demo date is fixed at **Monday 5 October 2026**. The default reporting perio
 
 Navigation follows the work: **Home**, **My work** (Issues, Plans), **Clients** (clients, signals, communications), **Delivery** (department, projects, Capacity, Rates & costs), **Finance** and **Administration**. Clients, Projects and Plans have preset views such as *Renewals soon*, *Needs intervention*, *Overdue collections* and *Staffing gaps*. Permissions, issue grouping and status rules are documented in [docs/permissions-and-issues.md](docs/permissions-and-issues.md).
 
+### Direct links to a profile
+
+Each profile has a shareable link that opens the app on it: `/agency`, `/branding_agency`, `/media_agency`, `/saas` and `/enterprise` (hyphens work too). Add a role to also pick the role, for example `/media_agency/finance` or `/branding_agency/account_owner`; the role part applies wherever the role switcher does (local demo and public preview) and is ignored for signed-in members. The links are listed under **Settings & demo**.
+
 ### Seeded agency scenarios
 
 | Scenario | Where to see it |
