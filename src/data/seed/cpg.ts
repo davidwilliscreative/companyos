@@ -72,7 +72,7 @@ export function buildCpg(): Dataset {
   });
 
   const people: Person[] = [
-    person("p_maya", "Maya Torres", "Founder & Chief Creative Officer", "Executive", "Leadership", "2014-05-01"),
+    person("p_maya", "Derek Torres", "Founder & Chief Creative Officer", "Executive", "Leadership", "2014-05-01"),
     person("p_eli", "Eli Brandt", "Director of Finance & Operations", "Finance", "Operations", "2020-03-02"),
     person("p_jess", "Jess Okoro", "Group Account Director", "Account management", "Client Services", "2019-08-05"),
     person("p_carter", "Carter Nguyen", "Account Director", "Account management", "Client Services", "2021-04-12"),
@@ -620,7 +620,7 @@ export function buildCpg(): Dataset {
       lastSuccessfulSync: "2026-10-05T05:30:00Z", lastAttempt: "2026-10-05T05:30:00Z",
       scopes: [{ scope: "gmail.readonly (authorized mailboxes only)", granted: true }],
       included: ["jess@shelfmark.example", "carter@shelfmark.example", "lena@shelfmark.example", "accounts@shelfmark.example"],
-      excluded: [{ name: "maya@shelfmark.example", reason: "Executive mailbox not authorized for analysis" }, { name: "Labels: Personal, Legal-privileged", reason: "Label exclusion" }],
+      excluded: [{ name: "derek@shelfmark.example", reason: "Executive mailbox not authorized for analysis" }, { name: "Labels: Personal, Legal-privileged", reason: "Label exclusion" }],
       failures: [], authoritativeFor: ["Client email threads"],
     },
     {
