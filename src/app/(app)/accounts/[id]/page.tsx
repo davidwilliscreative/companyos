@@ -4,6 +4,7 @@ import { AskAssistantButton, AssistantScope } from "@/components/Assistant";
 import { UsageChart } from "@/components/Charts";
 import { SignalRow } from "@/components/blocks";
 import { IssueCard, ISSUE_KIND_LABEL } from "@/components/issues";
+import { FlightTable, LaunchTable } from "@/components/profile-panels";
 import { LevelBadge, StatusPanel } from "@/components/status";
 import { Badge, Card, DefList, EmptyState, KindTag, MilestoneBadge, Notice, PageHeader, SeverityBadge, Tabs, CardLink } from "@/components/ui";
 import { ChangeRow } from "@/components/weekly";
@@ -46,6 +47,8 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
   const showInvoices = ws.profile.modules.invoices && ws.caps.viewCommercialTerms;
   const changes = ws.changes.items.filter((c) => c.accountId === acc.id);
   const mode = ws.profile.modules.financeMode;
+  const launches = Object.values(a.launches).filter((r) => r.launch.accountId === acc.id);
+  const flights = Object.values(a.media).filter((m) => m.flight.accountId === acc.id);
 
   // Tabs adapt to the profile and the role; a tab with nothing in it is not shown.
   const hasFinancials = showInvoices || (ws.caps.viewProjectCosts && projects.some((p) => a.projectFin[p.id])) || !!sub;
@@ -201,6 +204,16 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
 
       {tab === "delivery" && (
         <div className="space-y-3">
+          {launches.length > 0 && (
+            <Card title="Retail launches" subtitle="Shelf dates and the print deadlines behind them." padded={false}>
+              <LaunchTable ws={ws} rows={launches} showAccount={false} />
+            </Card>
+          )}
+          {flights.length > 0 && (
+            <Card title="Media flights" subtitle="Spend and KPI against plan, from ad platform reporting." padded={false}>
+              <FlightTable ws={ws} rows={flights} showAccount={false} />
+            </Card>
+          )}
           {projects.map((p) => {
             const f = a.projectFin[p.id];
             const ms = ws.data.milestones.filter((m) => m.projectId === p.id && a.milestones[m.id]?.state !== "done").sort((x, y) => (a.milestones[x.id].due < a.milestones[y.id].due ? -1 : 1));

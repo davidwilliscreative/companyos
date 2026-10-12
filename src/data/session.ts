@@ -1,7 +1,8 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { cache } from "react";
-import type { ProfileId, RoleId } from "@/domain/types";
+import { isProfileId } from "@/domain/profiles";
+import type { RoleId } from "@/domain/types";
 import type { CashAssumptions } from "@/lib/calc/company";
 import { isRole } from "@/lib/permissions";
 import { buildWorkspace, contextFor, type RequestContext, type Workspace } from "./access";
@@ -9,10 +10,6 @@ import { loadStore } from "./load-store";
 import { canSwitchRole, getMember } from "./member";
 
 export const COOKIE = { profile: "cos_profile", role: "cos_role", period: "cos_period" } as const;
-
-function isProfile(x: unknown): x is ProfileId {
-  return x === "agency" || x === "saas" || x === "enterprise";
-}
 
 /**
  * Profile and period come from cookies. The role comes from the signed-in person's membership when
@@ -26,7 +23,7 @@ export async function getRequestContext(): Promise<RequestContext> {
   const cookieRole = jar.get(COOKIE.role)?.value;
   const period = jar.get(COOKIE.period)?.value;
   const role: RoleId = canSwitchRole(member) && isRole(cookieRole) ? (cookieRole as RoleId) : (member?.role ?? "executive");
-  return contextFor(isProfile(profile) ? profile : "agency", role, period);
+  return contextFor(isProfileId(profile) ? profile : "agency", role, period);
 }
 
 /** One read of saved state per request, shared by the layout and the page. */

@@ -787,6 +787,8 @@ export function buildAgency(): Dataset {
     invoices,
     payments,
     subscriptions: [],
+    mediaFlights: [],
+    retailLaunches: [],
     threads,
     actions,
     connectors,

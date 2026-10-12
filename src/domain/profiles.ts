@@ -27,11 +27,17 @@ export interface ProfileConfig {
     subscriptions: boolean;
     dependencies: boolean;
     expansion: boolean;
+    /** Media plans: client spend pacing and KPI performance by channel (media agencies). */
+    mediaPacing: boolean;
+    /** Packaging launches tied to retailer shelf dates and printer deadlines (CPG branding agencies). */
+    retailLaunches: boolean;
   };
+  /** Starter questions offered in the assistant. */
+  suggestions: string[];
   healthComponents: { key: HealthComponentKey; label: string; weight: number }[];
 }
 
-export type HealthComponentKey = "delivery" | "financial" | "relationship" | "engagement" | "usage" | "budget";
+export type HealthComponentKey = "delivery" | "financial" | "relationship" | "engagement" | "usage" | "budget" | "media";
 
 export const PROFILES: Record<ProfileId, ProfileConfig> = {
   agency: {
@@ -55,11 +61,103 @@ export const PROFILES: Record<ProfileId, ProfileConfig> = {
       subscriptions: false,
       dependencies: true,
       expansion: true,
+      mediaPacing: false,
+      retailLaunches: false,
     },
+    suggestions: [
+      "Which accounts need attention this week, and why?",
+      "Which projects are forecast to miss their margin targets?",
+      "What is blocking this launch, and who owns the next step?",
+      "Which overdue invoices most affect our cash outlook?",
+      "Can we accept a new project given current staffing?",
+      "What changed since last week?",
+      "Where do we have credible expansion opportunities?",
+    ],
     healthComponents: [
       { key: "relationship", label: "Relationship signals", weight: 0.35 },
       { key: "delivery", label: "Delivery", weight: 0.3 },
       { key: "financial", label: "Financial", weight: 0.25 },
+      { key: "engagement", label: "Engagement recency", weight: 0.1 },
+    ],
+  },
+  cpg_branding: {
+    id: "cpg_branding",
+    label: "CPG branding agency",
+    description: "Independent branding and packaging agency for food, beverage and supplement brands: brand launches, rebrands, SKU rollouts and production design, all working back from retailer shelf dates.",
+    terms: {
+      account: "Brand client",
+      accounts: "Brand clients",
+      project: "Project",
+      projects: "Projects",
+      owner: "Account lead",
+      contract: "Engagement",
+      revenue: "Earned revenue",
+    },
+    modules: {
+      financeMode: "delivery",
+      billableUtilization: true,
+      invoices: true,
+      projectMargins: true,
+      subscriptions: false,
+      dependencies: true,
+      expansion: true,
+      mediaPacing: false,
+      retailLaunches: true,
+    },
+    suggestions: [
+      "Which brand launches are at risk of missing their shelf dates?",
+      "Which brand clients need attention this week, and why?",
+      "Which projects are forecast to miss their margin targets?",
+      "What is blocking the Harvest Table launch, and who owns the next step?",
+      "Can we take on another SKU rollout given production capacity?",
+      "What changed since last week?",
+      "Where do we have credible expansion opportunities?",
+    ],
+    healthComponents: [
+      { key: "relationship", label: "Relationship signals", weight: 0.35 },
+      { key: "delivery", label: "Delivery & shelf dates", weight: 0.3 },
+      { key: "financial", label: "Financial", weight: 0.25 },
+      { key: "engagement", label: "Engagement recency", weight: 0.1 },
+    ],
+  },
+  media: {
+    id: "media",
+    label: "Media agency",
+    description: "Digital-first media, data and content company: paid media planning and buying across search, social, programmatic, CTV and retail media, measurement, and a studio that produces content at scale.",
+    terms: {
+      account: "Client",
+      accounts: "Clients",
+      project: "Engagement",
+      projects: "Engagements",
+      owner: "Client partner",
+      contract: "Engagement",
+      revenue: "Earned fee revenue",
+    },
+    modules: {
+      financeMode: "delivery",
+      billableUtilization: true,
+      invoices: true,
+      projectMargins: true,
+      subscriptions: false,
+      dependencies: true,
+      expansion: true,
+      mediaPacing: true,
+      retailLaunches: false,
+    },
+    suggestions: [
+      "Which media plans are off pace or missing their KPI targets?",
+      "Which clients need attention this week, and why?",
+      "Which engagements are forecast to miss their margin targets?",
+      "What is holding up the Kinetic launch flight?",
+      "Can we take on a new client given paid media capacity?",
+      "What changed since last week?",
+      "Where do we have credible expansion opportunities?",
+    ],
+    healthComponents: [
+      { key: "relationship", label: "Relationship signals", weight: 0.3 },
+      { key: "media", label: "Media performance", weight: 0.25 },
+      { key: "delivery", label: "Delivery", weight: 0.2 },
+      { key: "financial", label: "Financial", weight: 0.15 },
       { key: "engagement", label: "Engagement recency", weight: 0.1 },
     ],
   },
@@ -84,7 +182,17 @@ export const PROFILES: Record<ProfileId, ProfileConfig> = {
       subscriptions: true,
       dependencies: true,
       expansion: true,
+      mediaPacing: false,
+      retailLaunches: false,
     },
+    suggestions: [
+      "Which customers need attention this week, and why?",
+      "Which renewals are at risk?",
+      "Why did Quarry Health's health decline?",
+      "Where do we have credible expansion opportunities?",
+      "What is blocking the SSO launch?",
+      "What changed since last week?",
+    ],
     healthComponents: [
       { key: "usage", label: "Product usage", weight: 0.35 },
       { key: "relationship", label: "Relationship signals", weight: 0.35 },
@@ -113,7 +221,10 @@ export const PROFILES: Record<ProfileId, ProfileConfig> = {
       subscriptions: false,
       dependencies: true,
       expansion: false,
+      mediaPacing: false,
+      retailLaunches: false,
     },
+    suggestions: ["Which business units need attention this week?", "Which initiatives are over budget?", "What is blocking the field service pilot?", "What changed since last week?", "Can we take on a new initiative given current staffing?"],
     healthComponents: [
       { key: "delivery", label: "Initiative delivery", weight: 0.45 },
       { key: "budget", label: "Budget", weight: 0.35 },
@@ -124,4 +235,8 @@ export const PROFILES: Record<ProfileId, ProfileConfig> = {
 
 export function getProfile(id: ProfileId): ProfileConfig {
   return PROFILES[id];
+}
+
+export function isProfileId(x: unknown): x is ProfileId {
+  return typeof x === "string" && Object.prototype.hasOwnProperty.call(PROFILES, x);
 }

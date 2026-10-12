@@ -141,7 +141,7 @@ describe("department workspace access", () => {
     expect(exec.scopeNote).toBeNull();
   });
 
-  it.each(["agency", "saas", "enterprise"] as ProfileId[])("works in the %s profile", (profile) => {
+  it.each(["agency", "cpg_branding", "media", "saas", "enterprise"] as ProfileId[])("works in the %s profile", (profile) => {
     const w = ws(profile, "department_head");
     const d = w.department()!;
     expect(d).not.toBeNull();

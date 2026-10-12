@@ -28,6 +28,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/signals", label: ws.profile.modules.expansion ? "Signals & opportunities" : "Signals", badge: unreviewed || undefined, badgeLabel: `${unreviewed} to review` },
     { href: "/communications", label: "Communications", hidden: caps.communications === "none" },
     { href: "/department", label: ws.departmentName ? `${ws.departmentName} department` : "Department", hidden: !ws.departmentName },
+    { href: "/launches", label: "Retail launches", hidden: !ws.profile.modules.retailLaunches },
+    { href: "/media", label: "Media pacing", hidden: !ws.profile.modules.mediaPacing },
     { href: "/projects", label: t.projects },
     { href: "/team", label: "Capacity" },
     { href: "/team/rates", label: "Rates & costs", hidden: !caps.viewProjectCosts },
@@ -38,27 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/calculations", label: "How numbers are calculated" },
   ];
   const degraded = ws.data.connectors.filter((c) => c.state === "degraded" || c.state === "failed" || c.state === "stale");
-  const suggestions =
-    ws.profile.id === "agency"
-      ? [
-          "Which accounts need attention this week, and why?",
-          "Which projects are forecast to miss their margin targets?",
-          "What is blocking this launch, and who owns the next step?",
-          "Which overdue invoices most affect our cash outlook?",
-          "Can we accept a new project given current staffing?",
-          "What changed since last week?",
-          "Where do we have credible expansion opportunities?",
-        ]
-      : ws.profile.id === "saas"
-        ? [
-            "Which customers need attention this week, and why?",
-            "Which renewals are at risk?",
-            "Why did Quarry Health's health decline?",
-            "Where do we have credible expansion opportunities?",
-            "What is blocking the SSO launch?",
-            "What changed since last week?",
-          ]
-        : ["Which business units need attention this week?", "Which initiatives are over budget?", "What is blocking the field service pilot?", "What changed since last week?", "Can we take on a new initiative given current staffing?"];
+  const suggestions = ws.profile.suggestions;
 
   const switcherProps = {
     profile: ws.ctx.profileId,

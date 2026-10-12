@@ -6,6 +6,7 @@ import { AskAssistantButton, AssistantScope } from "@/components/Assistant";
 import { ActionForm } from "@/components/forms";
 import { ScenarioCalculator } from "@/components/ScenarioCalculator";
 import { IssueCard } from "@/components/issues";
+import { FlightTable, LaunchTable } from "@/components/profile-panels";
 import { StatusPanel } from "@/components/status";
 import { Badge, Card, DefList, EmptyState, MilestoneBadge, Notice, PageHeader, Restricted, SeverityBadge, SourceTag, Stat, Tabs, CardLink } from "@/components/ui";
 import { interpretProject } from "@/lib/interpret";
@@ -37,6 +38,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const adj = ws.overlay.projectAdjustments[p.id];
   const deps = p.dependsOn.map((d) => ws.planning.projects.find((x) => x.id === d)).filter(Boolean);
   const dependents = ws.data.projects.filter((x) => x.dependsOn.includes(p.id));
+  const launches = Object.values(a.launches).filter((r) => r.launch.projectId === p.id);
+  const flights = Object.values(a.media).filter((m) => m.flight.projectId === p.id);
   const hoursByPerson = new Map<string, { hours: number; billable: number }>();
   for (const e of ws.data.timeEntries) {
     if (e.projectId !== p.id) continue;
@@ -149,6 +152,16 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       {tab === "delivery" && (
         <div className="space-y-6">
+      {launches.length > 0 && (
+        <Card title="Retail launches" subtitle="Shelf dates this project's artwork release has to meet." padded={false}>
+          <LaunchTable ws={ws} rows={launches} showAccount={false} />
+        </Card>
+      )}
+      {flights.length > 0 && (
+        <Card title="Media flights" subtitle="Spend and KPI against plan, from ad platform reporting." padded={false}>
+          <FlightTable ws={ws} rows={flights} showAccount={false} />
+        </Card>
+      )}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Milestones" padded={false}>
           {milestones.length === 0 ? (

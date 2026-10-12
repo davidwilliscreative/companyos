@@ -6,7 +6,7 @@ import { fmtPts } from "@/lib/money";
 import { buildIssues } from "@/lib/issues";
 import { ws } from "./helpers";
 
-const PROFILES: ProfileId[] = ["agency", "saas", "enterprise"];
+const PROFILES: ProfileId[] = ["agency", "cpg_branding", "media", "saas", "enterprise"];
 const ROLES: RoleId[] = ["executive", "finance", "account_owner", "department_head", "admin"];
 
 describe("issues", () => {

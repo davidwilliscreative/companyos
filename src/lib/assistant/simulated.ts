@@ -144,10 +144,10 @@ function compensation(c: Ctx): AssistantResponse {
 
 function parseNewWork(ws: Workspace, q: string) {
   const roleWords: [RegExp, string][] = [
-    [/dev(elop(ment|er)s?)?|engineer(ing)?|build/i, ws.profile.id === "agency" ? "Developer" : "Engineer"],
+    [/dev(elop(ment|er)s?)?|engineer(ing)?|build/i, ws.profile.modules.financeMode === "delivery" ? "Developer" : "Engineer"],
     [/design(ers?)?|ux|ui/i, "Designer"],
     [/strateg(y|ist)|content|copy/i, "Strategist"],
-    [/pm|project manag(er|ement)|product manag(er|ement)/i, ws.profile.id === "agency" ? "Project manager" : "Product manager"],
+    [/pm|project manag(er|ement)|product manag(er|ement)/i, ws.profile.modules.financeMode === "delivery" ? "Project manager" : "Product manager"],
     [/analy(st|tics)/i, "Analyst"],
   ];
   const hoursByRole: Record<string, number> = {};

@@ -2,12 +2,14 @@ import type { Dataset, EvidenceLink, ID, ISODate, Opportunity, Severity, Signal 
 import { getProfile } from "@/domain/profiles";
 import type { OrgOverlay } from "@/data/state";
 import { addDays, daysBetween, fmtDate } from "@/lib/dates";
-import { fmtMoney } from "@/lib/money";
+import { fmtMoney, fmtPct } from "@/lib/money";
 import { capacityOverview, type CapacityOverview } from "./calc/capacity";
 import { periodByKey, receivables, type Period } from "./calc/company";
 import { milestoneState, projectFinancials, type MilestoneState, type ProjectFinancials } from "./calc/finance";
 import { accountHealth, type AccountHealth } from "./calc/health";
 import { indexOf } from "./calc/index";
+import { launchReadiness, type LaunchReadiness } from "./calc/launch";
+import { fmtKpi, flightPacing, needsAttention, type FlightPacing } from "./calc/media";
 import { detectSignals } from "./signals/engine";
 
 /**
@@ -18,7 +20,7 @@ import { detectSignals } from "./signals/engine";
 
 export interface AttentionItem {
   id: string;
-  kind: "account" | "renewal" | "margin" | "schedule" | "invoice" | "capacity" | "opportunity" | "data" | "action";
+  kind: "account" | "renewal" | "margin" | "schedule" | "launch" | "pacing" | "invoice" | "capacity" | "opportunity" | "data" | "action";
   title: string;
   why: string;
   next: string;
@@ -44,6 +46,10 @@ export interface Analysis {
   healthPrev: Record<ID, number | null>;
   receivables: ReturnType<typeof receivables>;
   capacity: CapacityOverview;
+  /** Media profile: pacing and KPI status per media flight. */
+  media: Record<ID, FlightPacing>;
+  /** CPG branding profile: shelf-date readiness per retail launch. */
+  launches: Record<ID, LaunchReadiness>;
   attention: AttentionItem[];
   renewals: { accountId: ID; contractId: ID; name: string; renewalDate: ISODate; noticeDate: ISODate | null; /** null when the role may not see contract values. */ annualValue: number | null }[];
 }
@@ -121,6 +127,11 @@ export function computeAnalysis(ds: Dataset, overlay: OrgOverlay | null, periodK
   const idx = indexOf(ds);
   const profile = getProfile(ds.org.profileId);
   const period = periodByKey(ds, periodKey);
+
+  const media: Record<ID, FlightPacing> = {};
+  for (const f of ds.mediaFlights) media[f.id] = flightPacing(f, asOf);
+  const launches: Record<ID, LaunchReadiness> = {};
+  for (const l of ds.retailLaunches) launches[l.id] = launchReadiness(ds, l, asOf);
 
   const projectFin: Record<ID, ProjectFinancials> = {};
   for (const p of ds.projects) projectFin[p.id] = projectFinancials(ds, p, asOf);
@@ -201,6 +212,66 @@ export function computeAnalysis(ds: Dataset, overlay: OrgOverlay | null, periodK
     }
   }
 
+  for (const r of Object.values(launches)) {
+    const l = r.launch;
+    if (r.status !== "at_risk" && r.status !== "tight") continue;
+    if (r.status === "at_risk" && r.milestoneState === "done") continue;
+    const retailers = l.retailers.length > 1 ? `${l.retailers.slice(0, -1).join(", ")} and ${l.retailers.at(-1)}` : (l.retailers[0] ?? "Retail");
+    const projName = idx.project.get(l.projectId)?.name ?? l.name;
+    add({
+      id: `att_launch_${l.id}`,
+      kind: "launch",
+      title: `${projName}: ${retailers} shelf date ${fmtDate(l.shelfDate)} ${r.status === "at_risk" ? "is at risk" : "has little room left"}`,
+      why: `${l.name}: ${r.summary.charAt(0).toLowerCase()}${r.summary.slice(1)}. Final files are due at ${l.printer} by ${fmtDate(r.filesDue)} (${l.printLeadWeeks}-week print lead time) for ${l.skus} SKU${l.skus === 1 ? "" : "s"}.`,
+      next: r.milestoneState === "awaiting_client" ? "Get a decision date from the client approver and agree with the printer what the latest file date really is." : "Protect the release date: confirm owners for the remaining artwork and pre-book the press slot.",
+      severity: r.status === "at_risk" ? ((r.bufferDays ?? 0) < -7 ? "critical" : "high") : "medium",
+      impactValue: r.bufferDays === null ? null : -r.bufferDays,
+      impactLabel: (r.bufferDays ?? 0) < 0 ? "Past the print deadline" : "Before the print deadline",
+      ownerId: r.milestone?.ownerId ?? idx.project.get(l.projectId)?.ownerId ?? ds.org.demoPersonas.executive,
+      dueDate: addDays(asOf, 2),
+      accountId: l.accountId,
+      projectId: l.projectId,
+      links: [{ type: "project", id: l.projectId }, ...(r.milestone ? [{ type: "milestone" as const, id: r.milestone.id }] : [])],
+    });
+  }
+
+  for (const p of Object.values(media)) {
+    if (!needsAttention(p)) continue;
+    const f = p.flight;
+    const cur = ds.org.reportingCurrency;
+    const kpiLine = p.kpiStatus === "behind" ? `${f.kpi.metric} over the last 4 weeks is ${fmtKpi(f.kpi.metric, p.kpiRecent)} against a ${fmtKpi(f.kpi.metric, f.kpi.target)} target` : null;
+    const spendLine = p.status === "over" || p.status === "under" ? `${fmtMoney(p.spent, cur, { compact: true })} spent against ${fmtMoney(p.expected, cur, { compact: true })} planned to date; projected ${fmtMoney(p.projected, cur, { compact: true })} of a ${fmtMoney(f.budget, cur, { compact: true })} budget` : null;
+    const title =
+      p.status === "no_data" ? `${f.channel} (${f.platform}): ${p.summary.charAt(0).toLowerCase()}${p.summary.slice(1)}`
+      : p.status === "over" ? `${f.channel} (${f.platform}) is overpacing: projected ${fmtPct(p.projectedVariance)} over budget`
+      : p.status === "under" ? `${f.channel} (${f.platform}) is underpacing: projected ${fmtPct(-p.projectedVariance)} of budget unspent`
+      : `${f.channel} (${f.platform}) ${f.kpi.metric} is ${fmtPct(-(p.kpiGap ?? 0))} off target`;
+    const sev: Severity =
+      p.status === "no_data" ? "medium"
+      : p.status === "over" ? (p.projectedVariance >= 0.15 ? "high" : "medium")
+      : p.status === "under" ? (p.projectedVariance <= -0.3 ? "high" : "medium")
+      : (p.kpiGap ?? 0) <= -0.25 ? "high" : "medium";
+    add({
+      id: `att_media_${f.id}`,
+      kind: "pacing",
+      title,
+      why: [spendLine, kpiLine, p.status === "no_data" ? "Pacing and results cannot be checked until reporting resumes" : null, f.note].filter(Boolean).join(". ") + ".",
+      next:
+        p.status === "over" ? "Cap daily budgets on the platform today and confirm with the client whether the extra spend is approved."
+        : p.status === "under" ? "Agree with the client whether to reallocate the unspent budget to other channels or extend the flight."
+        : p.status === "no_data" ? "Restore the platform connection or get an export from the buyer before the next client report."
+        : "Review audiences, creative and bids with the buyer, then agree a test plan and a date to re-check.",
+      severity: sev,
+      impactValue: p.status === "over" || p.status === "under" ? Math.abs(p.projected - f.budget) : null,
+      impactLabel: p.status === "over" ? "Projected client overspend" : p.status === "under" ? "Client budget projected to go unspent" : p.status === "no_data" ? "Reporting gap" : `${f.kpi.metric} vs target`,
+      ownerId: f.ownerId,
+      dueDate: addDays(asOf, p.status === "over" ? 1 : 3),
+      accountId: f.accountId,
+      projectId: f.projectId,
+      links: [{ type: "project", id: f.projectId }, { type: "account", id: f.accountId }],
+    });
+  }
+
   for (const s of ar.overdue) {
     if (s.daysOverdue < 10) continue;
     add({ id: `att_inv_${s.invoice.id}`, kind: "invoice", title: `Invoice ${s.invoice.number} (${idx.account.get(s.invoice.accountId)?.name}) is ${s.daysOverdue} days overdue`, why: `${fmtMoney(s.outstanding, ds.org.reportingCurrency)} outstanding since ${fmtDate(s.invoice.dueDate)}.`, next: s.daysOverdue > 60 ? "Escalate collection and confirm a payment date; excluded from the base-case cash forecast." : "Chase payment and confirm a date.", severity: s.daysOverdue > 60 ? "high" : "medium", impactValue: s.outstanding, impactLabel: "Cash outstanding", ownerId: ds.org.demoPersonas.finance, dueDate: addDays(asOf, 2), accountId: s.invoice.accountId, links: [{ type: "invoice", id: s.invoice.id }, { type: "account", id: s.invoice.accountId }] });
@@ -224,5 +295,5 @@ export function computeAnalysis(ds: Dataset, overlay: OrgOverlay | null, periodK
   }
 
   items.sort((a, b) => b.score - a.score);
-  return { asOf, period, projectFin, milestones, signals, opportunities, health, healthPrev, receivables: ar, capacity, attention: items, renewals };
+  return { asOf, period, projectFin, milestones, signals, opportunities, health, healthPrev, receivables: ar, capacity, media, launches, attention: items, renewals };
 }

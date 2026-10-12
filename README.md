@@ -41,7 +41,7 @@ The demo date is fixed at **Monday 5 October 2026**. The default reporting perio
 5. **Switch role to Account owner** (Sofia Alvarez). Only her four clients load and figures are labeled *Your accounts*; other clients' work appears on Capacity as "Other work"; Rates & costs shows bill rates but no cost rates; asking the assistant about someone's salary is refused; asking about Meridian (not hers) is reported as restricted without naming its details.
 6. **Switch role to Department head** (Rosa Delgado, Head of Creative). Only the Creative team's six people and the projects they work on load. *Creative department* under Delivery shows watchouts in creative work (blocked or waiting tasks, unpriced requests, revision-heavy deliverables, time off, overloaded people), project profitability with the team's share of hours, retainer hours used against included (Atlas is over), the department P&L, hours by person and a simulated feedback score from client messages, each linked to the message. Team cost appears as totals, never salaries.
 7. **Switch role to Finance → Integrations → Google Sheets import.** Preview the compensation sheet to see validation errors (unknown person, invalid date, duplicate row), apply it, and preview again: every row is now *unchanged*. Omar Haddad's missing cost rate is filled in.
-8. **Switch profile** to SaaS startup (customers, ARR, seat usage, renewals) and Larger organization (business units, budgets, dependencies). Terminology, metrics, health components and modules change; billable utilization and client margins are not forced on them.
+8. **Switch profile** to CPG branding agency, Media agency (see [Agency variants](#agency-variants)), SaaS startup (customers, ARR, seat usage, renewals) and Larger organization (business units, budgets, dependencies). Terminology, metrics, health components and modules change; billable utilization and client margins are not forced on them.
 9. **Switch role to Administrator.** Home covers connections, mappings and imports and which reports they affect. No money, compensation or message content is loaded. *Administration* shows the capability matrix.
 
 Navigation follows the work: **Home**, **My work** (Issues, Plans), **Clients** (clients, signals, communications), **Delivery** (department, projects, Capacity, Rates & costs), **Finance** and **Administration**. Clients, Projects and Plans have preset views such as *Renewals soon*, *Needs intervention*, *Overdue collections* and *Staffing gaps*. Permissions, issue grouping and status rules are documented in [docs/permissions-and-issues.md](docs/permissions-and-issues.md).
@@ -61,6 +61,41 @@ Navigation follows the work: **Home**, **My work** (Issues, Plans), **Clients** 
 | Stale or insufficient information | Lumen Analytics (no recent contact, Slack channel not connected, an embedded prompt-injection message that is flagged and ignored) |
 
 Agency seed: 10 clients, 15 employees and 3 contractors, 18 projects, 28 tasks, about 1,350 weekly time entries, 62 invoices with payments and expenses, and 34 email and Slack threads over six months. SaaS: 8 customers and 4 product initiatives. Larger organization: 4 business units and 5 initiatives.
+
+### Agency variants
+
+Two extra profiles model specialist agencies. Both are fictional companies with synthetic clients; they were shaped by reviewing the public websites of a CPG branding agency (Moxie Sozo) and a media agency (Monks), but use no real names, clients or figures from either. They reuse the agency calculations (labor cost, margins, utilization, invoices, renewals, signals) and add one module each.
+
+**CPG branding agency: Shelfmark Studio.** A 21-person brand and packaging design studio for food, beverage and spirits brands. Services: brand strategy and positioning, packaging design and rebrands, production design and SKU rollouts, brand retainers. Departments: Strategy, Design (Hugo Silva's department view), Production, Client Services. Terminology: *Brand clients*, *Account lead*. Health weights delivery and shelf dates heavily.
+
+- **Retail launches** page and panels: each launch ties a release milestone to a retailer shelf date and the printer's lead time, and flags launches whose final artwork will miss the print deadline.
+
+| Scenario | Where to see it |
+| --- | --- |
+| Shelf date at risk, held by client claims approval | Harvest Table Foods → protein bowls for Target and Kroger (files forecast 4 days after the print deadline) |
+| Launch with no buffer left | Gold Hollow Distilling → small-batch bourbon (16-week glass decoration lead) |
+| Renewal risk after an acquisition (agency budget cuts) | Northfork Hard Seltzer |
+| Overloaded production artist | Tess Abbott (production work across several brands) |
+| Overdue invoice | Harvest Table Foods |
+| Credible expansion (with budget) | Fizzwell Beverage Co. → DTC website to match the new packaging |
+| Stale information | Juniper Lane Gin |
+
+**Media agency: Tempo Collective.** A 20-person performance and programmatic media agency. Services: paid media planning and buying, paid social, programmatic and CTV, retail media, measurement and MMM. Departments: Paid Media (Luis Ferreira's department view), Strategy & Planning, Analytics, Client Services. Terminology: *Engagements*, *Client partner*, *Earned fee revenue*. Health adds a *Media performance* component; agency fees are the revenue, client media budgets are tracked separately and never counted as agency revenue.
+
+- **Media pacing** page and panels: 18 flights across Meta, Google, TikTok, LinkedIn, Pinterest, The Trade Desk, Amazon Ads and CTV, with weekly spend, conversions and revenue from a simulated ad platform connector. Budgets and spend are commercial terms, hidden from roles without them.
+
+| Scenario | Where to see it |
+| --- | --- |
+| Flight overpacing client budget | Crestline Bank → LinkedIn lead generation |
+| Underpacing with stalled trafficking | Kinetic Footwear → launch film waiting on the client |
+| ROAS behind target | Bloomfield Home → Pinterest |
+| Ad platform reporting gap | Northstar Pet (connector degraded, no recent data) |
+| Renewal risk | Hearthstone Foods |
+| Engagement losing money | Solstice Hotels |
+| Overloaded media buyer | Kara Singh |
+| Credible expansion (with budget) | Arcwave Mobile → measurement and MMM |
+
+Shelfmark seed: 9 clients, 18 employees and 3 contractors, 14 projects, 6 retail launches, about 1,000 weekly time entries, 40 invoices and 38 threads. Tempo seed: 9 clients, 18 employees and 2 contractors, 12 engagements, 18 media flights, about 1,000 weekly time entries, 46 invoices and 35 threads.
 
 ## What is implemented, simulated, or future
 
@@ -88,6 +123,8 @@ All metrics are computed in application code (`src/lib/calc`). The in-app page *
 - **Cash forecast** starts from an observed opening balance and lists every assumption: collection timing (each client's observed lateness by default), invoices over 60 days overdue excluded from the base case, future billing schedules, payroll day, contractor payment lag and overhead. Assumptions can be changed on the page without saving anything. Opportunity values are never included.
 - **Currency.** One reporting currency (USD, EUR or GBP) with fixed demo exchange rates. The agency has one EUR-billed contractor.
 - **Health** is a transparent weighted score per profile. Missing components reduce completeness; below 70% completeness, or with three or more data gaps, the account is "insufficient data". An open critical risk caps the status at "watch".
+- **Retail launch readiness** (CPG branding): files due = shelf date − print lead time; buffer = files due − forecast release of the artwork milestone. Negative buffer is *at risk*; under 7 days, or waiting on the client, is *little buffer*.
+- **Media pacing** (media agency): planned to date = budget × elapsed ÷ flight days; projected = spend to date + last two weeks' run rate × days remaining. Over pace above +5% projected (or 10% ahead of plan), under pace below −10%; CPA or ROAS more than 10% worse than target over the last four weeks is *behind*.
 - **Signals** use rules over thread context with a 30-day recency half-life, track resolution and contradicting messages, and avoid duplicates (one signal per account and category). Confidence describes evidence strength, not probability. No churn probabilities are produced.
 
 ## Architecture
@@ -98,7 +135,7 @@ Next.js 15 (App Router, server components and server actions), React 19, TypeScr
 src/
   domain/        types.ts (industry-neutral entities), profiles.ts (terminology, modules, health weights)
   data/
-    seed/        deterministic synthetic data per profile (agency, saas, enterprise)
+    seed/        deterministic synthetic data per profile (agency, cpg, media, saas, enterprise)
     state.ts     overlay of demo edits; store.ts (JSON file / in-memory)
     dataset.ts   seed + validated imports + applied scenarios + mapping decisions, normalized to reporting currency
     access.ts    the permission boundary: builds a role- and org-scoped Workspace

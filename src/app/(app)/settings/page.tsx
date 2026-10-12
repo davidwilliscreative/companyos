@@ -126,7 +126,7 @@ export default async function SettingsPage() {
                   </td>
                 ))}
               </tr>
-              {(["billableUtilization", "invoices", "projectMargins", "subscriptions", "expansion"] as const).map((m) => (
+              {(["billableUtilization", "invoices", "projectMargins", "subscriptions", "expansion", "retailLaunches", "mediaPacing"] as const).map((m) => (
                 <tr key={m}>
                   <td className="td">{m.replace(/([A-Z])/g, " $1").toLowerCase()}</td>
                   {Object.values(PROFILES).map((p) => (
