@@ -75,7 +75,7 @@ export function buildMedia(): Dataset {
   });
 
   const people: Person[] = [
-    person("p_ava", "Ava Lindqvist", "Chief Executive Officer", "Executive", "Leadership", "2017-02-01"),
+    person("p_ava", "Greg Lindqvist", "Chief Executive Officer", "Executive", "Leadership", "2017-02-01"),
     person("p_rafael", "Rafael Ortiz", "Finance Director", "Finance", "Operations", "2020-05-04"),
     person("p_nadia", "Nadia Haddad", "Client Partner", "Account management", "Client Services", "2019-09-02"),
     person("p_owen", "Owen Price", "Client Partner", "Account management", "Client Services", "2021-01-18"),
@@ -612,7 +612,7 @@ export function buildMedia(): Dataset {
       lastSuccessfulSync: "2026-10-05T05:30:00Z", lastAttempt: "2026-10-05T05:30:00Z",
       scopes: [{ scope: "gmail.readonly (authorized mailboxes only)", granted: true }],
       included: ["nadia@tempo.example", "owen@tempo.example", "mei@tempo.example", "accounts@tempo.example"],
-      excluded: [{ name: "ava@tempo.example", reason: "Executive mailbox not authorized for analysis" }, { name: "Labels: Personal, Legal-privileged", reason: "Label exclusion" }],
+      excluded: [{ name: "greg@tempo.example", reason: "Executive mailbox not authorized for analysis" }, { name: "Labels: Personal, Legal-privileged", reason: "Label exclusion" }],
       failures: [], authoritativeFor: ["Client email threads"],
     },
     {
